@@ -101,12 +101,12 @@ def live_loss_plot(i, log_file_path, figure):
 
     elif len(losses) == 2:
         ax.axhline(float(losses[1].split(',')[-1]), color='#A6ACAF', linestyle='--', label="baseline validation loss")
+        ax.set_xticks([0, 1])
 
-    if len(losses) < 2:
-        ax.grid('ON', color='#F2F3F4')
-        plt.xlabel('epoch')
-        plt.ylabel(f'loss ({loss_function})')
-        figure.tight_layout()
+    ax.grid('ON', color='#F2F3F4')
+    plt.xlabel('epoch')
+    plt.ylabel(f'loss ({loss_function})')
+    figure.tight_layout()
 
     plt.legend(loc='best')
 

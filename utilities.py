@@ -43,7 +43,7 @@ def denoise_patch(vol, model, device='cuda'):
     return den_arr
 
 
-def denoise_volume_gaussian(vol, model, overlap=None, patch_size=128, device='cuda'):
+def denoise_volume_gaussian(vol, model, overlap=None, patch_size=[128,128,128], device='cuda'):
 
     if torch.is_tensor(vol):
         arr = vol.detach().cpu().numpy()
@@ -54,14 +54,19 @@ def denoise_volume_gaussian(vol, model, overlap=None, patch_size=128, device='cu
         raise ValueError('Input volume must either be a torch.Tensor or a numpy.ndarray.')
 
     # Gaussian kernel
-    ax = np.arange(-(patch_size // 2), patch_size // 2)
-    xx, yy, zz = np.meshgrid(ax, ax, ax)
-    xx = xx + 0.5
-    yy = yy + 0.5
-    zz = zz + 0.5
-    sigma = patch_size / 4
-    kernel = np.exp(-(xx ** 2 + yy ** 2 + zz ** 2) / (2 * sigma ** 2))
-    kernel = kernel / np.sum(kernel)
+    ax_z = np.arange(-(patch_size[0] // 2), patch_size[0] // 2) + 0.5
+    ax_y = np.arange(-(patch_size[1] // 2), patch_size[1] // 2) + 0.5
+    ax_x = np.arange(-(patch_size[2] // 2), patch_size[2] // 2) + 0.5
+    zz, yy, xx = np.meshgrid(ax_z, ax_y, ax_x, indexing='ij')
+    sigma_z = patch_size[0] / 4
+    sigma_y = patch_size[1] / 4
+    sigma_x = patch_size[2] / 4
+    kernel = np.exp(-(
+            (xx ** 2) / (2 * sigma_x ** 2) +
+            (yy ** 2) / (2 * sigma_y ** 2) +
+            (zz ** 2) / (2 * sigma_z ** 2)
+    ))  # Compute anisotropic 3D Gaussian kernel
+    kernel /= np.sum(kernel)    # Normalize to sum to 1
 
     # AS THERE WILL BE OVERLAP BETWEEN PATCHES, TWO EMPTY ARRAYS ARE CREATED BEFOREHAND: ONE TO KEEP SUMMING THE VALUES
     # OUTPUT BY THE NETWORK, IN THEIR RESPECTIVE INDICES, AND ONE TO COUNT HOW MANY TIMES EACH VOXEL IS FED INTO THE
@@ -76,14 +81,14 @@ def denoise_volume_gaussian(vol, model, overlap=None, patch_size=128, device='cu
 
     if overlap is None:
         # NUMBER OF PATCHES NECESSARY TO COVER THE WHOLE-VOLUME IN EACH OF THE THREE MAIN DIRECTIONS
-        rz = int(np.ceil(depth / patch_size))
-        ry = int(np.ceil(height / patch_size))
-        rx = int(np.ceil(width / patch_size))
+        rz = int(np.ceil(depth / patch_size[0]))
+        ry = int(np.ceil(height / patch_size[1]))
+        rx = int(np.ceil(width / patch_size[2]))
 
         # TOTAL NUMBER OF VOXELS THAT WILL BE OVERLAPPING IN EACH OF THE THREE MAIN DIRECTIONS
-        sz = patch_size * rz - depth
-        sy = patch_size * ry - height
-        sx = patch_size * rx - width
+        sz = patch_size[0] * rz - depth
+        sy = patch_size[1] * ry - height
+        sx = patch_size[2] * rx - width
 
         # TOTAL NUMBER OF VOXELS OVERLAPPING BETWEEN EACH PAIR OF CONSECUTIVE PATCHES (EXCEPT THE LAST ONE)
         try:
@@ -92,7 +97,7 @@ def denoise_volume_gaussian(vol, model, overlap=None, patch_size=128, device='cu
             divz = 0
         if divz == 1 and rz > 2:
             rz = rz + 1
-            sz = patch_size * rz - depth
+            sz = patch_size[0] * rz - depth
             divz = int(np.ceil(sz / (rz - 1)))
         try:
             divy = int(np.ceil(sy / (ry - 1)))
@@ -100,7 +105,7 @@ def denoise_volume_gaussian(vol, model, overlap=None, patch_size=128, device='cu
             divy = 0
         if divy == 1 and ry > 2:
             ry = ry + 1
-            sy = patch_size * ry - height
+            sy = patch_size[1] * ry - height
             divy = int(np.ceil(sy / (ry - 1)))
         try:
             divx = int(np.ceil(sx / (rx - 1)))
@@ -108,20 +113,18 @@ def denoise_volume_gaussian(vol, model, overlap=None, patch_size=128, device='cu
             divx = 0
         if divx == 1 and rx > 2:
             rx = rx + 1
-            sx = patch_size * rx - width
+            sx = patch_size[2] * rx - width
             divx = int(np.ceil(sx / (rx - 1)))
 
-    elif 0 < overlap < 1:
+    elif 0 < overlap < 1:   # not tested!!
 
-        div = int(np.ceil(patch_size * overlap))
+        divz = int(np.ceil(patch_size[0] * overlap))
+        divy = int(np.ceil(patch_size[1] * overlap))
+        divx = int(np.ceil(patch_size[2] * overlap))
 
-        rz = int(np.ceil((depth - div) / (patch_size - div)))
-        ry = int(np.ceil((height - div) / (patch_size - div)))
-        rx = int(np.ceil((width - div) / (patch_size - div)))
-
-        divx = div
-        divy = div
-        divz = div
+        rz = int(np.ceil((depth - divz) / (patch_size[0] - divz)))
+        ry = int(np.ceil((height - divy) / (patch_size[1] - divy)))
+        rx = int(np.ceil((width - divx) / (patch_size[2] - divx)))
 
     else:
         raise ValueError('Overlap fraction must be a float in the interval ]0, 1[.')
@@ -137,86 +140,89 @@ def denoise_volume_gaussian(vol, model, overlap=None, patch_size=128, device='cu
             for x in range(1, rx + 1):
 
                 if x != rx and y != ry and z != rz:
-                    patch = arr[start_z:start_z + patch_size, start_y:start_y + patch_size,
-                            start_x:start_x + patch_size]
+                    patch = arr[start_z:start_z + patch_size[0], start_y:start_y + patch_size[1],
+                            start_x:start_x + patch_size[2]]
                     patch = patch_to_tensor(patch)
                     den = model(patch.to(device).unsqueeze(0))  # (c, h, w) ----.unsqueeze(0)---> (b, c, h, w)
                     den = den.detach().cpu().squeeze(0)
                     den = np.asarray(den.squeeze(0))
-                    den_arr[start_z:start_z + patch_size, start_y:start_y + patch_size,
-                    start_x:start_x + patch_size] += den * kernel
-                    counter_arr[start_z:start_z + patch_size, start_y:start_y + patch_size,
-                    start_x:start_x + patch_size] += kernel
+                    den_arr[start_z:start_z + patch_size[0], start_y:start_y + patch_size[1],
+                    start_x:start_x + patch_size[2]] += den * kernel
+                    counter_arr[start_z:start_z + patch_size[0], start_y:start_y + patch_size[1],
+                    start_x:start_x + patch_size[2]] += kernel
 
                 elif x == rx and y != ry and z != rz:
-                    patch = arr[start_z:start_z + patch_size, start_y:start_y + patch_size, -patch_size:]
+                    patch = arr[start_z:start_z + patch_size[0], start_y:start_y + patch_size[1], -patch_size[2]:]
                     patch = patch_to_tensor(patch)
                     den = model(patch.to(device).unsqueeze(0))  # (c, h, w) ----.unsqueeze(0)---> (b, c, h, w)
                     den = den.detach().cpu().squeeze(0)
                     den = np.asarray(den.squeeze(0))
-                    den_arr[start_z:start_z + patch_size, start_y:start_y + patch_size,
-                    -patch_size:] += den * kernel
-                    counter_arr[start_z:start_z + patch_size, start_y:start_y + patch_size, -patch_size:] += kernel
+                    den_arr[start_z:start_z + patch_size[0], start_y:start_y + patch_size[1],
+                    -patch_size[2]:] += den * kernel
+                    counter_arr[start_z:start_z + patch_size[0], start_y:start_y + patch_size[1],
+                    -patch_size[2]:] += kernel
 
                 elif x != rx and y == ry and z != rz:
-                    patch = arr[start_z:start_z + patch_size, -patch_size:, start_x:start_x + patch_size]
+                    patch = arr[start_z:start_z + patch_size[0], -patch_size[1]:, start_x:start_x + patch_size[2]]
                     patch = patch_to_tensor(patch)
                     den = model(patch.to(device).unsqueeze(0))  # (c, h, w) ----.unsqueeze(0)---> (b, c, h, w)
                     den = den.detach().cpu().squeeze(0)
                     den = np.asarray(den.squeeze(0))
-                    den_arr[start_z:start_z + patch_size, -patch_size:,
-                    start_x:start_x + patch_size] += den * kernel
-                    counter_arr[start_z:start_z + patch_size, -patch_size:, start_x:start_x + patch_size] += kernel
+                    den_arr[start_z:start_z + patch_size[0], -patch_size[1]:,
+                    start_x:start_x + patch_size[2]] += den * kernel
+                    counter_arr[start_z:start_z + patch_size[0], -patch_size[1]:,
+                    start_x:start_x + patch_size[2]] += kernel
 
                 elif z == rz and y != ry and x != rx:
-                    patch = arr[-patch_size:, start_y:start_y + patch_size, start_x:start_x + patch_size]
+                    patch = arr[-patch_size[0]:, start_y:start_y + patch_size[1], start_x:start_x + patch_size[2]]
                     patch = patch_to_tensor(patch)
                     den = model(patch.to(device).unsqueeze(0))  # (c, h, w) ----.unsqueeze(0)---> (b, c, h, w)
                     den = den.detach().cpu().squeeze(0)
                     den = np.asarray(den.squeeze(0))
-                    den_arr[-patch_size:, start_y:start_y + patch_size,
-                    start_x:start_x + patch_size] += den * kernel
-                    counter_arr[-patch_size:, start_y:start_y + patch_size, start_x:start_x + patch_size] += kernel
+                    den_arr[-patch_size[0]:, start_y:start_y + patch_size[1],
+                    start_x:start_x + patch_size[2]] += den * kernel
+                    counter_arr[-patch_size[0]:, start_y:start_y + patch_size[1],
+                    start_x:start_x + patch_size[2]] += kernel
 
                 elif z != rz and y == ry and x == rx:
-                    patch = arr[start_z:start_z + patch_size, -patch_size:, -patch_size:]
+                    patch = arr[start_z:start_z + patch_size[0], -patch_size[1]:, -patch_size[2]:]
                     patch = patch_to_tensor(patch)
                     den = model(patch.to(device).unsqueeze(0))  # (c, h, w) ----.unsqueeze(0)---> (b, c, h, w)
                     den = den.detach().cpu().squeeze(0)
                     den = np.asarray(den.squeeze(0))
-                    den_arr[start_z:start_z + patch_size, -patch_size:, -patch_size:] += den * kernel
-                    counter_arr[start_z:start_z + patch_size, -patch_size:, -patch_size:] += kernel
+                    den_arr[start_z:start_z + patch_size[0], -patch_size[1]:, -patch_size[2]:] += den * kernel
+                    counter_arr[start_z:start_z + patch_size[0], -patch_size[1]:, -patch_size[2]:] += kernel
 
                 elif z == rz and y != ry and x == rx:
-                    patch = arr[-patch_size:, start_y:start_y + patch_size, -patch_size:]
+                    patch = arr[-patch_size[0]:, start_y:start_y + patch_size[1], -patch_size[2]:]
                     patch = patch_to_tensor(patch)
                     den = model(patch.to(device).unsqueeze(0))  # (c, h, w) ----.unsqueeze(0)---> (b, c, h, w)
                     den = den.detach().cpu().squeeze(0)
                     den = np.asarray(den.squeeze(0))
-                    den_arr[-patch_size:, start_y:start_y + patch_size, -patch_size:] += den * kernel
-                    counter_arr[-patch_size:, start_y:start_y + patch_size, -patch_size:] += kernel
+                    den_arr[-patch_size[0]:, start_y:start_y + patch_size[1], -patch_size[2]:] += den * kernel
+                    counter_arr[-patch_size[0]:, start_y:start_y + patch_size[1], -patch_size[2]:] += kernel
 
                 elif z == rz and y == ry and x != rx:
-                    patch = arr[-patch_size:, -patch_size:, start_x:start_x + patch_size]
+                    patch = arr[-patch_size[0]:, -patch_size[1]:, start_x:start_x + patch_size[2]]
                     patch = patch_to_tensor(patch)
                     den = model(patch.to(device).unsqueeze(0))  # (c, h, w) ----.unsqueeze(0)---> (b, c, h, w)
                     den = den.detach().cpu().squeeze(0)
                     den = np.asarray(den.squeeze(0))
-                    den_arr[-patch_size:, -patch_size:, start_x:start_x + patch_size] += den * kernel
-                    counter_arr[-patch_size:, -patch_size:, start_x:start_x + patch_size] += kernel
+                    den_arr[-patch_size[0]:, -patch_size[1]:, start_x:start_x + patch_size[2]] += den * kernel
+                    counter_arr[-patch_size[0]:, -patch_size[1]:, start_x:start_x + patch_size[2]] += kernel
 
                 elif z == rz and y == ry and x == rx:
-                    patch = arr[-patch_size:, -patch_size:, -patch_size:]
+                    patch = arr[-patch_size[0]:, -patch_size[1]:, -patch_size[2]:]
                     patch = patch_to_tensor(patch)
                     den = model(patch.to(device).unsqueeze(0))  # (c, h, w) ----.unsqueeze(0)---> (b, c, h, w)
                     den = den.detach().cpu().squeeze(0)
                     den = np.asarray(den.squeeze(0))
-                    den_arr[-patch_size:, -patch_size:, -patch_size:] += den * kernel
-                    counter_arr[-patch_size:, -patch_size:, -patch_size:] += kernel
+                    den_arr[-patch_size[0]:, -patch_size[1]:, -patch_size[2]:] += den * kernel
+                    counter_arr[-patch_size[0]:, -patch_size[1]:, -patch_size[2]:] += kernel
 
-                start_x = (patch_size - divx) * x
-            start_y = (patch_size - divy) * y
-        start_z = (patch_size - divz) * z
+                start_x = (patch_size[2] - divx) * x
+            start_y = (patch_size[1] - divy) * y
+        start_z = (patch_size[0] - divz) * z
 
     den_arr = den_arr / counter_arr
 
@@ -411,13 +417,13 @@ def create_configuration_file():
 
         configuration["N_epochs"] = int(input("Enter number of epochs for training: "))
 
-        configuration["validation_every_N_epochs"] = int(input("Run validation every __ epochs: "))
+        configuration["validation_every_N_epochs"] = int(input("Run validation every __ epochs (e.g. 20): "))
 
         configuration["learning_rate"] = float(input("Enter learning rate for training: "))
 
         configuration["learning_rate_decay_rate"] = float(input("Enter learning rate decay rate (e.g. 0.9): "))
 
-        configuration["learning_rate_decay_steps"] = int(input("Enter learning rate decay steps (e.g. 20): "))
+        configuration["learning_rate_decay_steps"] = int(input("Make learning rate decay every __ epochs (e.g. 50): "))
 
         while configuration["perform_data_augmentation"] not in ['True', 'False']:
             configuration["perform_data_augmentation"] = (

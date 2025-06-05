@@ -94,8 +94,12 @@ def validator(data_loader, model, loss_function, device):
 
 
 # ------------------------------------------------------------------------------------- training parameter configuration
-with open('configuration.json') as json_file:
-    configuration = json.load(json_file)
+if os.path.isfile('configuration.json'):
+    with open('configuration.json') as json_file:
+        configuration = json.load(json_file)
+else:
+    print('No configuration file found! Please run 1_define_training_configuration.py first!')
+    sys.exit()
 
 training_pairs = configuration["dataset"]["training_pairs"]
 validation_folds = configuration["dataset"]["validation_folds"]

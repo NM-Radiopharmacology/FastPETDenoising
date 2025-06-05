@@ -4,6 +4,8 @@
 import os
 import time
 from datetime import datetime
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.animation as animation
@@ -15,6 +17,7 @@ def live_loss_plot(i, log_file_path, figure):
     # data
     losses = open(log_file_path, "r").read()
     losses = losses.split('\n')
+    losses.remove('')
 
     loss_function = losses[0].split('(')[1].split(')')[0]
 
@@ -97,15 +100,15 @@ def live_loss_plot(i, log_file_path, figure):
             ax.set_ylim(0, np.median(validation_losses) * 2)
 
     elif len(losses) == 2:
-        ax.axhline(float(losses[1].split(',')[-1]), color='#A6ACAF', linestyle='--',
-                   label="baseline validation loss")
+        ax.axhline(float(losses[1].split(',')[-1]), color='#A6ACAF', linestyle='--', label="baseline validation loss")
 
-    if len(losses) >= 2:
+    if len(losses) < 2:
         ax.grid('ON', color='#F2F3F4')
-        plt.legend(loc='best')
         plt.xlabel('epoch')
         plt.ylabel(f'loss ({loss_function})')
         figure.tight_layout()
+
+    plt.legend(loc='best')
 
 
 current_training_folder = None
@@ -136,5 +139,6 @@ fig = plt.figure(figsize=(12, 6), num=f"{current_training_folder.split(os.sep)[-
 anim = animation.FuncAnimation(fig,
                                partial(live_loss_plot, log_file_path=training_log_file, figure=fig),
                                interval=5000, cache_frame_data=False)
-plt.show()
+
+plt.show(block=True)
 fig.savefig(os.path.join(current_training_folder, f"loss_plot_fold{current_fold}.png"), dpi=300)

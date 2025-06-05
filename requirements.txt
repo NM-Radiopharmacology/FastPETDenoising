@@ -1,0 +1,8 @@
+torch>=1.13
+torchsummary
+matplotlib
+tqdm
+itk
+scikit-image
+pandas
+SimpleITK

@@ -10,19 +10,11 @@ from utilities import kfold_cross_validation, print2, create_configuration_file,
 import json
 
 
-# Would you like to use standard training parameters? Set to False to introduce manually
-use_default_training_params = None
-while use_default_training_params not in ['True', 'False']:
-    use_default_training_params = (
-        input("Enter whether to use default training parameters (True) or to set them manually (False): "))
-use_default_training_params = bool(use_default_training_params)
-
+# Setting training configuration, including providing training pairs...
 # Providing dataset: paths to folders with training images and references will be requested: images must be ordered
 # and paired!!
-dataset = get_dataset()
-training_pairs = dataset['training_pairs']
-
-configuration = create_configuration_file(default_params=use_default_training_params, training_pairs=training_pairs)
+configuration = create_configuration_file()
+training_pairs = configuration["dataset"]["training_pairs"]
 
 # 3-fold cross-validation for training
 validation_folds = kfold_cross_validation(k=3, data=training_pairs)

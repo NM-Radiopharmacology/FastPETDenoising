@@ -21,6 +21,7 @@ import shutil
 import torch
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
+print2(f"Is cuda available? {torch.cuda.is_available()} --> device: {device}")
 
 
 # --------------------------------------------------------------------------------------------------- training utilities

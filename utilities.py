@@ -332,8 +332,8 @@ def get_dataset(training_pairs=None, path_to_training=None, path_to_reference=No
     if training_pairs is None:
         training_pairs = []
         if path_to_training is None or path_to_reference is None:
-            path_to_reference = input("Enter path to the reference images (ordered): ")
-            path_to_training = input("Enter path to the training images (ordered): ")
+            path_to_training = input("Enter path to the training images: ")
+            path_to_reference = input("Enter path to the respective reference images (must be ordered accordingly!): ")
 
             if len(os.listdir(path_to_training)) == len(os.listdir(path_to_reference)):
                 for img, ref in zip(sorted(os.listdir(path_to_training)), sorted(os.listdir(path_to_reference))):
@@ -357,12 +357,13 @@ def get_dataset(training_pairs=None, path_to_training=None, path_to_reference=No
     return dataset
 
 
-def create_configuration_file(default_params=True, training_pairs=None):
+def create_configuration_file():
+
     config_file = "configuration.json"
 
     configuration = {
         "datetime": datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
-        "dataset": get_dataset(training_pairs),
+        "dataset": get_dataset(),
         "patch_size": None,
         "network_configuration": None,
         "loss_function": None,
@@ -377,11 +378,16 @@ def create_configuration_file(default_params=True, training_pairs=None):
         "training_set_fraction": 0.25
     }
 
-    while configuration["network_configuration"] not in ["3D", "2.5D-1channel", "2.5D-3channel"]:
-        configuration["network_configuration"] =\
-            input("Enter network configuration (3D, 2.5D-1channel, 2.5D-3channel): ")
-
-    if not default_params:
+    # Would you like to use standard training parameters? Set to False to introduce manually
+    use_default_training_params = None
+    while use_default_training_params not in ['true', 'false']:
+        use_default_training_params = (
+            input("Enter whether to use default training parameters (True) or to set them manually (False): ")).lower()
+    if use_default_training_params == 'true':
+        use_default_training_params = True
+    else:
+        use_default_training_params = False
+    if not use_default_training_params:
 
         is_patch_size_defined = False
         while not is_patch_size_defined:
@@ -434,6 +440,10 @@ def create_configuration_file(default_params=True, training_pairs=None):
         configuration["learning_rate_decay_rate"] = 0.9
         configuration["learning_rate_decay_steps"] = 50
         configuration["perform_data_augmentation"] = True
+
+    while configuration["network_configuration"] not in ["3D", "2.5D-1channel", "2.5D-3channel"]:
+        configuration["network_configuration"] =\
+            input("Enter network configuration (3D, 2.5D-1channel, 2.5D-3channel): ")
 
     configuration_json = json.dumps(configuration, indent=4)
     open(config_file, "w").close()

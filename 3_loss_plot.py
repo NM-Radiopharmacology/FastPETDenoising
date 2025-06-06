@@ -2,6 +2,7 @@
 (optional) script to generate a matplotlib figure window with the loss plot (live update)
 """
 import os
+import sys
 import time
 from datetime import datetime
 import matplotlib
@@ -15,8 +16,7 @@ from functools import partial
 def live_loss_plot(i, log_file_path, figure):
 
     # data
-    losses = open(log_file_path, "r").read()
-    losses = losses.split('\n')
+    losses = open(log_file_path, "r").read().split('\n')
     losses.remove('')
 
     loss_function = losses[0].split('(')[1].split(')')[0]
@@ -60,8 +60,8 @@ def live_loss_plot(i, log_file_path, figure):
         ax.axhline(baseline_validation_loss, color='#A6ACAF', linestyle='--',
                    label="baseline validation loss")
         plt.annotate(str(np.round(baseline_validation_loss, decimals=4)),
-                     (1, baseline_validation_loss), textcoords='offset pixels',
-                     xytext=(8, -12), fontsize=8)
+                     (1, baseline_validation_loss), color='#A6ACAF', textcoords='offset pixels',
+                     xytext=(8, 6), fontsize=8)
 
         # plotting training loss
         ax.plot(training_epochs, training_losses, color='#76D7C4', label='training loss')
@@ -126,19 +126,25 @@ for item in os.listdir(os.getcwd()):
             latest_creation = creation
             current_training_folder = os.path.join(os.getcwd(), item)
 
-current_fold = 0
-for item in os.listdir(current_training_folder):
-    if item.startswith("training_log"):
-        fold = int(item.split("fold")[-1].replace(".txt", ""))
-        if fold > current_fold:
-            current_fold = fold
+if current_training_folder is not None:
 
-training_log_file = os.path.join(current_training_folder, f"training_log_fold{current_fold}.txt")
+    current_fold = 0
+    for item in os.listdir(current_training_folder):
+        if item.startswith("training_log"):
+            fold = int(item.split("fold")[-1].replace(".txt", ""))
+            if fold > current_fold:
+                current_fold = fold
 
-fig = plt.figure(figsize=(12, 6), num=f"{current_training_folder.split(os.sep)[-1]}_fold{current_fold}_loss_plot")
-anim = animation.FuncAnimation(fig,
-                               partial(live_loss_plot, log_file_path=training_log_file, figure=fig),
-                               interval=5000, cache_frame_data=False)
+    training_log_file = os.path.join(current_training_folder, f"training_log_fold{current_fold}.txt")
 
-plt.show(block=True)
-fig.savefig(os.path.join(current_training_folder, f"loss_plot_fold{current_fold}.png"), dpi=300)
+    fig = plt.figure(figsize=(12, 6), num=f"{current_training_folder.split(os.sep)[-1]}_fold{current_fold}_loss_plot")
+    anim = animation.FuncAnimation(fig,
+                                   partial(live_loss_plot, log_file_path=training_log_file, figure=fig),
+                                   interval=5000, cache_frame_data=False)
+
+    plt.show()
+    fig.savefig(os.path.join(current_training_folder, f"loss_plot_fold{current_fold}.png"), dpi=300)
+
+else:
+    print("No training instance found to plot!")
+    sys.exit()

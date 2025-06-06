@@ -13,7 +13,7 @@ import SimpleITK as sitk
 from data_augmentation_utilities import augment
 
 
-def print2(*args):
+def printdt(*args):
     print(datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), *args)
 
 
@@ -278,7 +278,7 @@ def kfold_cross_validation(k, data):
         validation_folds[f"fold{k}"] = data[-(len(data)-start):]
 
     else:
-        print2("please provide enough training pairs for k-fold cross-validation")
+        printdt("please provide enough training pairs for k-fold cross-validation")
 
     return validation_folds
 
@@ -291,7 +291,7 @@ def check_dataset_integrity(training_pairs):
     different_spacings = []
     mismatch_image_reference = False
 
-    print2('checking dataset integrity...')
+    printdt('checking dataset integrity...')
     for img, ref in tqdm(training_pairs, file=sys.stdout, desc=datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")):
 
         img_itk = itk.imread(img)
@@ -322,12 +322,12 @@ def check_dataset_integrity(training_pairs):
             mismatch_image_reference = True
 
     if len(different_spacings) > 1:
-        print2("Warning! Spacing must match among the dataset! "
+        printdt("Warning! Spacing must match among the dataset! "
                f"The following spacings were found: {different_spacings}. "
                "Please resample all images to the same spacing.")
 
     if mismatch_image_reference:
-        print2("Warning! Training images and reference images must match in size and spacing! "
+        printdt("Warning! Training images and reference images must match in size and spacing! "
                "Mismatches were found and excluded from the dataset.")
 
     return spacing, validation_image_size
@@ -349,7 +349,7 @@ def get_dataset(training_pairs=None, path_to_training=None, path_to_reference=No
                     training_pairs.append([img, ref])
 
             else:
-                print2("reference images must match training images!")
+                printdt("reference images must match training images!")
                 return
 
     spacing, validation_image_size = check_dataset_integrity(training_pairs)
@@ -383,6 +383,10 @@ def create_configuration_file():
         "perform_data_augmentation": None,
         "training_set_fraction": 0.25
     }
+
+    while configuration["network_configuration"] not in ["3D", "2.5D-1channel", "2.5D-3channel"]:
+        configuration["network_configuration"] =\
+            input("Enter network configuration (3D, 2.5D-1channel, 2.5D-3channel): ")
 
     # Would you like to use standard training parameters? Set to False to introduce manually
     use_default_training_params = None
@@ -436,9 +440,9 @@ def create_configuration_file():
 
     else:
 
-        configuration["patch_size"] = 128
+        configuration["patch_size"] = [128, 128, 128]
         configuration["loss_function"] = "MSE"
-        configuration["batch_size"] = 2 if configuration["network_configuration"] == "3D" else 144
+        configuration["batch_size"] = 1 if configuration["network_configuration"] == "3D" else 144
         configuration["optimizer"] = "Adam"
         configuration["N_epochs"] = 1000
         configuration["validation_every_N_epochs"] = 20
@@ -447,16 +451,12 @@ def create_configuration_file():
         configuration["learning_rate_decay_steps"] = 50
         configuration["perform_data_augmentation"] = True
 
-    while configuration["network_configuration"] not in ["3D", "2.5D-1channel", "2.5D-3channel"]:
-        configuration["network_configuration"] =\
-            input("Enter network configuration (3D, 2.5D-1channel, 2.5D-3channel): ")
-
     configuration_json = json.dumps(configuration, indent=4)
     open(config_file, "w").close()
     with open(config_file, "w") as config_file:
         config_file.write(configuration_json)
 
-    print2("configuration file created")
+    printdt("configuration file created")
 
     return configuration
 

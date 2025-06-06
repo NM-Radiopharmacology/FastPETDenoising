@@ -6,7 +6,7 @@ script to establish training configuration
 OUTPUT: A configuration.json file is created --> 2_train.py will run from this file, therefore, this script must be
 run beforehand
 """
-from utilities import kfold_cross_validation, print2, create_configuration_file, get_dataset
+from utilities import kfold_cross_validation, printdt, create_configuration_file
 import json
 
 
@@ -26,4 +26,4 @@ open("configuration.json", "w").close()
 with open("configuration.json", "w") as config_file:
     config_file.write(configuration_json)
 
-print2("training configuration established")
+printdt("training configuration established")

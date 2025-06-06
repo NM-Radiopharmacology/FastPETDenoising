@@ -1,12 +1,12 @@
 """
 script to train the network
 training is performed from the configuration.json file in the project's directory
-run define_training_configuration.py to configure training and create configuration.json accordingly
+run 1_define_training_configuration.py to configure training and create configuration.json accordingly
 """
 import os
 import numpy as np
 import pandas as pd
-from utilities import print2, CrossCorrLoss, L1NormalizedLoss, denoise_volume_gaussian, denoise_patch, MakeTorchDataset
+from utilities import printdt, CrossCorrLoss, L1NormalizedLoss, denoise_volume_gaussian, denoise_patch, MakeTorchDataset
 from torch import nn
 import json
 import datetime
@@ -21,7 +21,7 @@ import shutil
 import torch
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-print2(f"Is cuda available? {torch.cuda.is_available()} --> device: {device}")
+printdt(f"Is cuda available? {torch.cuda.is_available()} --> device: {device}")
 
 
 # --------------------------------------------------------------------------------------------------- training utilities
@@ -116,7 +116,7 @@ loss_function_key = configuration['loss_function']
 training_set_fraction = configuration['training_set_fraction']
 perform_data_augmentation = configuration['perform_data_augmentation']
 
-print2("training configuration loaded")
+printdt("training configuration loaded")
 
 # ------------------------------------------------------------------------------------------------------------- training
 folder = f"training_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')}"
@@ -124,7 +124,7 @@ os.makedirs(folder)
 os.rename("configuration.json", os.path.join(folder, "configuration.json"))
 
 for fold in validation_folds.keys():
-    print2(f"starting {fold}...")
+    printdt(f"starting {fold}...")
 
     best_epoch = 0  # initialising epoch
     lr = configuration["learning_rate"]
@@ -138,20 +138,20 @@ for fold in validation_folds.keys():
     training_lst = [pair for pair in training_pairs if pair not in validation_folds[fold]]
     validation_lst = validation_folds[fold]
 
-    print2(f'training set size: {len(training_lst)}')
-    print2(f'validation set size: {len(validation_lst)}')
+    printdt(f'training set size: {len(training_lst)}')
+    printdt(f'validation set size: {len(validation_lst)}')
 
     train_df = pd.DataFrame(training_lst, columns=['images', 'targets'])
     training_set = MakeTorchDataset(train_df, patch_size=patch_size, augmentations=False)
 
     valid_df = pd.DataFrame(validation_lst, columns=['images', 'targets'])
 
-    print2("batching validation set")
+    printdt("batching validation set")
     validation_set = MakeTorchDataset(valid_df, augmentations=False, patch_size=patch_size,
                                       validation=True, validation_image_size=validation_image_size)
     validation_loader = DataLoader(validation_set, batch_size=configuration['batch_size'])
 
-    print2(f"calculating baseline loss ({loss_function_key})")
+    printdt(f"calculating baseline loss ({loss_function_key})")
 
     valid_mse = []
     for valid_paths in tqdm(validation_lst, file=sys.stdout,
@@ -166,9 +166,9 @@ for fold in validation_folds.keys():
         f.write(f"epoch,training_loss({loss_function_key}),validation_loss({loss_function_key})\n")
         f.write(f"{best_epoch},,{baseline_valid_loss}\n")
 
-    print2("baseline loss:", baseline_valid_loss)
+    printdt("baseline loss:", baseline_valid_loss)
 
-    print2("loading model")
+    printdt("loading model")
 
     model = None
     if network_configuration == "3D":
@@ -177,7 +177,7 @@ for fold in validation_folds.keys():
         summary(model, (1, patch_size[0], patch_size[1], patch_size[2]))
     # add support for other network configurations (patch size must also be dealt with!)
 
-    print2("starting training")
+    printdt("starting training")
     best_valid_loss = baseline_valid_loss
     valid_loss = baseline_valid_loss
     for i in range(1, configuration["N_epochs"] + 1):
@@ -190,7 +190,7 @@ for fold in validation_folds.keys():
 
         optimiser = torch.optim.Adam(model.parameters(), lr=lr)     # initialising optimiser
 
-        print2(f'[{i}] learning rate: {np.round(lr, 8)}')
+        printdt(f'[{i}] learning rate: {np.round(lr, 8)}')
 
         train_loss = trainer(training_loader, model, optimiser, loss_function[loss_function_key], device)
 
@@ -198,13 +198,13 @@ for fold in validation_folds.keys():
 
             valid_loss = validator(validation_loader, model, loss_function[loss_function_key], device)
 
-            print2(f"[epoch {i}] training loss: {train_loss} | validation loss: {valid_loss}")
+            printdt(f"[epoch {i}] training loss: {train_loss} | validation loss: {valid_loss}")
 
             with open(training_log_file, "a") as f:
                 f.write(f'{i},{train_loss},{valid_loss}\n')
 
         else:
-            print2(f"[epoch {i}] training loss: {train_loss}")
+            printdt(f"[epoch {i}] training loss: {train_loss}")
 
             with open(training_log_file, "a") as f:
                 f.write(f'{i},{train_loss}\n')
@@ -225,5 +225,5 @@ for fold in validation_folds.keys():
             best_model = best_model.replace(str(best_epoch).zfill(4), str(i).zfill(4))
             torch.save(model.state_dict(), os.path.join(folder, best_model))
             best_epoch = i
-            print2("model saved")
+            printdt("model saved")
             best_valid_loss = valid_loss

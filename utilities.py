@@ -540,7 +540,7 @@ def create_configuration_file():
 
     else:
 
-        configuration["patch_size"] = [128, 128, 128]
+        configuration["patch_size"] = [128, 128, 128] if configuration["network_configuration"] == "3D" else [144, 144]
         configuration["loss_function"] = "MSE"
         configuration["batch_size"] = 1 if configuration["network_configuration"] == "3D" else 144
         configuration["optimizer"] = "Adam"

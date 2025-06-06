@@ -18,15 +18,16 @@ def printdt(*args):
 
 
 def patch_to_tensor(patch):
-
-    patch = np.expand_dims(patch, axis=-1)
-    patch = np.transpose(patch, (3, 0, 1, 2)).astype(float)
-
+    if len(patch.shape) == 3:
+        patch = np.expand_dims(patch, axis=-1)
+        patch = np.transpose(patch, (3, 0, 1, 2)).astype(float)
+    else:
+        patch = np.expand_dims(patch, axis=-1)
+        patch = np.transpose(patch, (2, 0, 1)).astype(float)
     return torch.Tensor(patch)
 
 
 def denoise_patch(vol, model, device='cuda'):
-
     if torch.is_tensor(vol):
         arr = vol.detach().cpu().numpy()
         arr = np.asarray(arr.squeeze(0))
@@ -43,8 +44,106 @@ def denoise_patch(vol, model, device='cuda'):
     return den_arr
 
 
-def denoise_volume_gaussian(vol, model, overlap=None, patch_size=[128,128,128], device='cuda'):
+def denoise_slice_gaussian(vol, model, overlap=None, patch_size=None, device='cuda'):
+    if patch_size is None:
+        patch_size = [144, 144]
+    if torch.is_tensor(vol):
+        arr = vol.detach().cpu().numpy()
+        arr = np.asarray(arr.squeeze(0))
+    elif isinstance(vol, np.ndarray):
+        arr = vol
+    else:
+        raise ValueError('Input volume must either be a torch.Tensor or a numpy.ndarray.')
 
+    # 2D Gaussian kernel
+    ax_y = np.arange(-(patch_size[0] // 2), patch_size[0] // 2) + 0.5
+    ax_x = np.arange(-(patch_size[1] // 2), patch_size[1] // 2) + 0.5
+    yy, xx = np.meshgrid(ax_y, ax_x, indexing='ij')
+    sigma_y = patch_size[0] / 4
+    sigma_x = patch_size[1] / 4
+    kernel = np.exp(-((xx ** 2) / (2 * sigma_x ** 2) + (yy ** 2) / (2 * sigma_y ** 2)))
+    kernel /= np.sum(kernel)
+
+    # Init output and counter arrays
+    den_arr = np.zeros(arr.shape)
+    counter_arr = np.zeros(arr.shape)
+
+    height = arr.shape[0]  # y
+    width = arr.shape[1]  # x
+
+    if overlap is None:
+        ry = int(np.ceil(height / patch_size[0]))
+        rx = int(np.ceil(width / patch_size[1]))
+
+        sy = patch_size[0] * ry - height
+        sx = patch_size[1] * rx - width
+
+        try:
+            divy = int(np.ceil(sy / (ry - 1)))
+        except ZeroDivisionError:
+            divy = 0
+        if divy == 1 and ry > 2:
+            ry += 1
+            sy = patch_size[0] * ry - height
+            divy = int(np.ceil(sy / (ry - 1)))
+
+        try:
+            divx = int(np.ceil(sx / (rx - 1)))
+        except ZeroDivisionError:
+            divx = 0
+        if divx == 1 and rx > 2:
+            rx += 1
+            sx = patch_size[1] * rx - width
+            divx = int(np.ceil(sx / (rx - 1)))
+
+    elif 0 < overlap < 1:
+        divy = int(np.ceil(patch_size[0] * overlap))
+        divx = int(np.ceil(patch_size[1] * overlap))
+
+        ry = int(np.ceil((height - divy) / (patch_size[0] - divy)))
+        rx = int(np.ceil((width - divx) / (patch_size[1] - divx)))
+    else:
+        raise ValueError('Overlap fraction must be a float in the interval ]0, 1[.')
+
+    # Iterate over patches
+    start_y = 0
+    for y in range(1, ry + 1):
+        start_x = 0
+        for x in range(1, rx + 1):
+            # Calculate patch location
+            if y != ry and x != rx:
+                patch = arr[start_y:start_y + patch_size[0], start_x:start_x + patch_size[1]]
+                den_slice = (slice(start_y, start_y + patch_size[0]), slice(start_x, start_x + patch_size[1]))
+            elif y == ry and x != rx:
+                patch = arr[-patch_size[0]:, start_x:start_x + patch_size[1]]
+                den_slice = (slice(-patch_size[0], None), slice(start_x, start_x + patch_size[1]))
+            elif y != ry and x == rx:
+                patch = arr[start_y:start_y + patch_size[0], -patch_size[1]:]
+                den_slice = (slice(start_y, start_y + patch_size[0]), slice(-patch_size[1], None))
+            elif y == ry and x == rx:
+                patch = arr[-patch_size[0]:, -patch_size[1]:]
+                den_slice = (slice(-patch_size[0], None), slice(-patch_size[1], None))
+
+            # Inference and accumulate
+            patch_tensor = patch_to_tensor(patch)
+            den = model(patch_tensor.to(device).unsqueeze(0))  # (c, h, w) -> (1, c, h, w)
+            den = den.detach().cpu().squeeze(0)
+            den = np.asarray(den.squeeze(0))
+            den_arr[den_slice] += den * kernel
+            counter_arr[den_slice] += kernel
+
+            start_x = (patch_size[1] - divx) * x
+        start_y = (patch_size[0] - divy) * y
+
+    # Final normalized output
+    den_arr = den_arr / counter_arr
+
+    return den_arr
+
+
+def denoise_volume_gaussian(vol, model, overlap=None, patch_size=None, device='cuda'):
+    if patch_size is None:
+        patch_size = [128, 128, 128]
     if torch.is_tensor(vol):
         arr = vol.detach().cpu().numpy()
         arr = np.asarray(arr.squeeze(0))
@@ -66,14 +165,14 @@ def denoise_volume_gaussian(vol, model, overlap=None, patch_size=[128,128,128], 
             (yy ** 2) / (2 * sigma_y ** 2) +
             (zz ** 2) / (2 * sigma_z ** 2)
     ))  # Compute anisotropic 3D Gaussian kernel
-    kernel /= np.sum(kernel)    # Normalize to sum to 1
+    kernel /= np.sum(kernel)  # Normalize to sum to 1
 
     # AS THERE WILL BE OVERLAP BETWEEN PATCHES, TWO EMPTY ARRAYS ARE CREATED BEFOREHAND: ONE TO KEEP SUMMING THE VALUES
     # OUTPUT BY THE NETWORK, IN THEIR RESPECTIVE INDICES, AND ONE TO COUNT HOW MANY TIMES EACH VOXEL IS FED INTO THE
     # NETWORK. IN THE END, THE DIVISION BETWEEN THE FORMER AND THE LATTER WILL PROVIDE THE WHOLE VOLUME PROCESSED BY THE
     # MODEL IN PATCHES.
-    den_arr = np.zeros(arr.shape)       # EMPTY ARRAY IN WHICH THE NETWORK'S OUTPUT WILL BE STORED (BY SUM)
-    counter_arr = np.zeros(arr.shape)   # EMPTY ARRAY TO COUNT THE NUMBER OF TIMES EACH VOXEL IS FED INTO THE NETWORK
+    den_arr = np.zeros(arr.shape)  # EMPTY ARRAY IN WHICH THE NETWORK'S OUTPUT WILL BE STORED (BY SUM)
+    counter_arr = np.zeros(arr.shape)  # EMPTY ARRAY TO COUNT THE NUMBER OF TIMES EACH VOXEL IS FED INTO THE NETWORK
 
     depth = arr.shape[0]  # z; axial
     height = arr.shape[1]  # y; coronal
@@ -116,7 +215,7 @@ def denoise_volume_gaussian(vol, model, overlap=None, patch_size=[128,128,128], 
             sx = patch_size[2] * rx - width
             divx = int(np.ceil(sx / (rx - 1)))
 
-    elif 0 < overlap < 1:   # not tested!!
+    elif 0 < overlap < 1:  # not tested!!
 
         divz = int(np.ceil(patch_size[0] * overlap))
         divy = int(np.ceil(patch_size[1] * overlap))
@@ -261,21 +360,20 @@ class L1NormalizedLoss(nn.Module):
         x = output
         y = target
 
-        return torch.mean(torch.abs(x-y)/(x+y+1))
+        return torch.mean(torch.abs(x - y) / (x + y + 1))
 
 
 def kfold_cross_validation(k, data):
-
     validation_folds = {}
 
     if len(data) >= k:
         random.shuffle(data)
-        fold_size = int(np.ceil(len(data)/3))
+        fold_size = int(np.ceil(len(data) / 3))
         start = 0
-        for i in range(k-1):
-            validation_folds[f"fold{i+1}"] = data[start:start+fold_size]
+        for i in range(k - 1):
+            validation_folds[f"fold{i + 1}"] = data[start:start + fold_size]
             start = start + fold_size
-        validation_folds[f"fold{k}"] = data[-(len(data)-start):]
+        validation_folds[f"fold{k}"] = data[-(len(data) - start):]
 
     else:
         printdt("please provide enough training pairs for k-fold cross-validation")
@@ -284,7 +382,6 @@ def kfold_cross_validation(k, data):
 
 
 def check_dataset_integrity(training_pairs):
-
     spacing = None
     validation_image_size = None
 
@@ -323,18 +420,17 @@ def check_dataset_integrity(training_pairs):
 
     if len(different_spacings) > 1:
         printdt("Warning! Spacing must match among the dataset! "
-               f"The following spacings were found: {different_spacings}. "
-               "Please resample all images to the same spacing.")
+                f"The following spacings were found: {different_spacings}. "
+                "Please resample all images to the same spacing.")
 
     if mismatch_image_reference:
         printdt("Warning! Training images and reference images must match in size and spacing! "
-               "Mismatches were found and excluded from the dataset.")
+                "Mismatches were found and excluded from the dataset.")
 
     return spacing, validation_image_size
 
 
 def get_dataset(training_pairs=None, path_to_training=None, path_to_reference=None):
-
     if training_pairs is None:
         training_pairs = []
         if path_to_training is None or path_to_reference is None:
@@ -364,8 +460,7 @@ def get_dataset(training_pairs=None, path_to_training=None, path_to_reference=No
 
 
 def create_configuration_file():
-
-    config_file = "configuration.json"
+    config_file = "training_2025-02-10_15-11/configuration.json"
 
     configuration = {
         "datetime": datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
@@ -385,7 +480,7 @@ def create_configuration_file():
     }
 
     while configuration["network_configuration"] not in ["3D", "2.5D-1channel", "2.5D-3channel"]:
-        configuration["network_configuration"] =\
+        configuration["network_configuration"] = \
             input("Enter network configuration (3D, 2.5D-1channel, 2.5D-3channel): ")
 
     # Would you like to use standard training parameters? Set to False to introduce manually
@@ -406,8 +501,13 @@ def create_configuration_file():
             patch_size_input = patch_size_input[1:-1].split(',')
             try:
                 patch_size = [int(s) for s in patch_size_input]
-                is_patch_size_defined = True
-                configuration["patch_size"] = patch_size
+                if ((configuration["network_configuration"] == '3D' and len(patch_size) == 3) or
+                        ('2.5D' in configuration["network_configuration"] and len(patch_size) == 2)):
+                    is_patch_size_defined = True
+                    configuration["patch_size"] = patch_size
+                else:
+                    printdt(f"Invalid patch size ({patch_size}) for a {configuration['network_configuration']} network "
+                            f"configuration!")
             except ValueError:
                 pass
 
@@ -534,7 +634,7 @@ class MakeTorchDataset(Dataset):
                         print("patch size larger than image size!")
                         return 1  # NOT TESTED YET
 
-                z, y, x = random_indices[0], random_indices[1], random_indices[2]
+                z, y, x = random_indices[0], random_indices[1], random_indices[2]  # adapt for 2D
                 # ------------------------------------------------------------------------------------------------------
 
                 # Transforming size (D, W, H) to (D, W, H, C) where C is the number of channels
@@ -545,7 +645,7 @@ class MakeTorchDataset(Dataset):
                 # Transforming size (D, W, H) to (D, W, H, C) where C is the number of channels
                 target = target[z:z + patch_size[0], y:y + patch_size[1], x:x + patch_size[2]]
 
-            else:   # augmentations = True
+            else:  # augmentations = True
                 # Input image
                 image = sitk.ReadImage(image_path)  # ATTENTION: path must not contain accents
                 shape = sitk.GetArrayFromImage(image).shape
@@ -586,4 +686,3 @@ class MakeTorchDataset(Dataset):
         target = torch.Tensor(target)
 
         return image, target
-

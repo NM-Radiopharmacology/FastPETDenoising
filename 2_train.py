@@ -15,6 +15,7 @@ import itk
 import sys
 from skimage.metrics import mean_squared_error
 from networks.unet_three_d import UNet3D
+from networks.unet_two_and_a_half_d import UNet25D
 from torchsummary import summary
 from torch.utils.data import DataLoader, Subset
 import shutil
@@ -173,9 +174,19 @@ for fold in validation_folds.keys():
     model = None
     if network_configuration == "3D":
         model = UNet3D()
-        model.to(device)
-        summary(model, (1, patch_size[0], patch_size[1], patch_size[2]))
-    # add support for other network configurations (patch size must also be dealt with!)
+        input_size = (1, patch_size[0], patch_size[1], patch_size[2])
+    elif network_configuration == "2.5D-1channel":
+        model = UNet25D(in_channels=1)
+        input_size = (1, patch_size[0], patch_size[1])
+    elif network_configuration == "2.5D-3channel":
+        model = UNet25D(in_channels=3)
+        input_size = (1, patch_size[0], patch_size[1])
+    else:
+        printdt(f"unknown network_configuration: {network_configuration}")
+        sys.exit()
+
+    model.to(device)
+    summary(model, input_size)
 
     printdt("starting training")
     best_valid_loss = baseline_valid_loss

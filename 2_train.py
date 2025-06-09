@@ -6,7 +6,9 @@ run 1_define_training_configuration.py to configure training and create configur
 import os
 import numpy as np
 import pandas as pd
-from utilities import printdt, CrossCorrLoss, L1NormalizedLoss, denoise_volume_gaussian, denoise_patch, MakeTorchDataset
+from utilities import printdt, denoise_volume_gaussian, denoise_slice_gaussian, denoise_patch
+from make_torch_dataset import MakeTorchDataset
+from custom_losses import L1NormalizedLoss, CrossCorrLoss
 from torch import nn
 import json
 import datetime
@@ -70,11 +72,45 @@ def validator(data_loader, model, loss_function, device):
 
             for im in images:
                 arr = im.detach().cpu().numpy()
-                arr = np.asarray(arr.squeeze(0))
+                if network_configuration != "3channel-2.5D":
+                    arr = arr.squeeze(0)
+                arr = np.asarray(arr)
 
                 if list(arr.shape) != list(patch_size):
 
-                    den = denoise_volume_gaussian(arr, model, patch_size=patch_size)
+                    if network_configuration == "3D":
+                        den = denoise_volume_gaussian(arr, model, patch_size=patch_size)
+                    elif network_configuration == "1channel-2.5D":
+                        den = np.zeros(arr.shape)
+                        for i in range(arr.shape[0]):   # axial denoising
+                            den_slice = denoise_slice_gaussian(arr[i, :, :], model, patch_size=patch_size)
+                            den[i, :, :] = den[i, :, :] + den_slice
+                        for j in range(arr.shape[1]):   # coronal denoising
+                            den_slice = denoise_slice_gaussian(arr[:, j, :], model, patch_size=patch_size)
+                            den[:, j, :] = den[:, j, :] + den_slice
+                        for k in range(arr.shape[2]):   # sagittal denoising
+                            den_slice = denoise_slice_gaussian(arr[:, :, k], model, patch_size=patch_size)
+                            den[:, :, k] = den[:, :, k] + den_slice
+                        den = den / 3   # average of axial, coronal and sagittal-based denoising
+                    elif network_configuration == "3channel-2.5D":
+                        den = np.zeros(arr.shape)
+                        for i in range(arr.shape[0]):   # axial denoising
+                            if i == 0 or i == arr.shape[0] - 1:
+                                if i == 0:
+                                    slice_to_reflect = arr[i+1, :, :]
+                                if i == arr.shape[0] - 1:
+                                    slice_to_reflect = arr[arr.shape[0] - 2, :, :]
+
+                                slice_to_denoise = np.zeros([3, arr.shape[1], arr.shape[2]])
+                                slice_to_denoise[0, :, :] = slice_to_reflect
+                                slice_to_denoise[1, :, :] = arr[i, :, :]
+                                slice_to_denoise[2, :, :] = slice_to_reflect
+                            else:
+                                slice_to_denoise = arr[i-1:i+1, :, :]
+
+                            den_slice = denoise_slice_gaussian(slice_to_denoise, model, patch_size=patch_size)
+                            den[i, :, :] = den[i, :, :] + den_slice
+
                     den = np.expand_dims(den, axis=-1)
                     out.append(np.transpose(den, (3, 0, 1, 2)).astype(float))
 
@@ -109,9 +145,6 @@ validation_image_size = configuration["dataset"]["validation_image_size"]
 
 patch_size = configuration["patch_size"]
 
-if len(patch_size) == 1:
-    patch_size = [patch_size, patch_size, patch_size]
-
 network_configuration = configuration['network_configuration']
 loss_function_key = configuration['loss_function']
 training_set_fraction = configuration['training_set_fraction']
@@ -136,19 +169,45 @@ for fold in validation_folds.keys():
     best_model = f"unet_{configuration['network_configuration']}_{fold}_{str(best_epoch).zfill(4)}.pt"
     last_model = best_model  # initialising model
 
-    training_lst = [pair for pair in training_pairs if pair not in validation_folds[fold]]
     validation_lst = validation_folds[fold]
+    if network_configuration == "3D":
+        training_lst = [pair for pair in training_pairs if pair not in validation_folds[fold]]
+    else:
+        training_lst = []
+        for pair in training_pairs:
+            if pair not in validation_folds[fold]:
+                img_shape = np.asarray(itk.imread(pair[0])).shape
+                if network_configuration == "1channel-2.5D":
+                    for n_dim, dim in enumerate(img_shape):
+                        if n_dim == 2:
+                            anatomical_plane = 'sagittal'   # x
+                        elif n_dim == 1:
+                            anatomical_plane = 'coronal'    # y
+                        else:
+                            anatomical_plane = 'axial'      # z
+                        for i in range(dim):    # maybe remove 5% of slices in extremities?
+                            training_lst.append([pair[0], pair[1], anatomical_plane, i])
+                elif network_configuration == "3channel-2.5D":
+                    anatomical_plane = 'axial'      # z
+                    for i in range(img_shape[0]):
+                        if i != 0 and i != img_shape[0] - 1:    # excluding first and last slices
+                            training_lst.append([pair[0], pair[1], anatomical_plane, i])
 
     printdt(f'training set size: {len(training_lst)}')
     printdt(f'validation set size: {len(validation_lst)}')
 
-    train_df = pd.DataFrame(training_lst, columns=['images', 'targets'])
-    training_set = MakeTorchDataset(train_df, patch_size=patch_size, augmentations=False)
-
+    if network_configuration == "3D":
+        columns = ['image', 'target']
+    else:
+        columns = ['image', 'target', 'anatomical_plane', 'coordinate']
+    train_df = pd.DataFrame(training_lst, columns=columns)
+    training_set = MakeTorchDataset(train_df, patch_size=patch_size, augmentations=perform_data_augmentation,
+                                    network_configuration=network_configuration)
     valid_df = pd.DataFrame(validation_lst, columns=['images', 'targets'])
 
     printdt("batching validation set")
     validation_set = MakeTorchDataset(valid_df, augmentations=False, patch_size=patch_size,
+                                      network_configuration=network_configuration,
                                       validation=True, validation_image_size=validation_image_size)
     validation_loader = DataLoader(validation_set, batch_size=configuration['batch_size'])
 
@@ -175,12 +234,12 @@ for fold in validation_folds.keys():
     if network_configuration == "3D":
         model = UNet3D()
         input_size = (1, patch_size[0], patch_size[1], patch_size[2])
-    elif network_configuration == "2.5D-1channel":
+    elif network_configuration == "1channel-2.5D":
         model = UNet25D(in_channels=1)
         input_size = (1, patch_size[0], patch_size[1])
-    elif network_configuration == "2.5D-3channel":
+    elif network_configuration == "3channel-2.5D":
         model = UNet25D(in_channels=3)
-        input_size = (1, patch_size[0], patch_size[1])
+        input_size = (3, patch_size[0], patch_size[1])
     else:
         printdt(f"unknown network_configuration: {network_configuration}")
         sys.exit()

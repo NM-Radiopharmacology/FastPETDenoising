@@ -1,16 +1,12 @@
 import datetime
 import os
-from torch import nn
 import torch
-from torch.utils.data import Dataset
 import numpy as np
 import random
 import sys
 from tqdm import tqdm
 import json
 import itk
-import SimpleITK as sitk
-from data_augmentation_utilities import augment
 
 
 def printdt(*args):
@@ -44,14 +40,14 @@ def denoise_patch(vol, model, device='cuda'):
     return den_arr
 
 
-def denoise_slice_gaussian(vol, model, overlap=None, patch_size=None, device='cuda'):
+def denoise_slice_gaussian(slc, model, overlap=None, patch_size=None, device='cuda'):
     if patch_size is None:
         patch_size = [144, 144]
-    if torch.is_tensor(vol):
-        arr = vol.detach().cpu().numpy()
+    if torch.is_tensor(slc):
+        arr = slc.detach().cpu().numpy()
         arr = np.asarray(arr.squeeze(0))
-    elif isinstance(vol, np.ndarray):
-        arr = vol
+    elif isinstance(slc, np.ndarray):
+        arr = slc
     else:
         raise ValueError('Input volume must either be a torch.Tensor or a numpy.ndarray.')
 
@@ -64,12 +60,19 @@ def denoise_slice_gaussian(vol, model, overlap=None, patch_size=None, device='cu
     kernel = np.exp(-((xx ** 2) / (2 * sigma_x ** 2) + (yy ** 2) / (2 * sigma_y ** 2)))
     kernel /= np.sum(kernel)
 
-    # Init output and counter arrays
-    den_arr = np.zeros(arr.shape)
-    counter_arr = np.zeros(arr.shape)
+    dim = arr.ndim
 
-    height = arr.shape[0]  # y
-    width = arr.shape[1]  # x
+    if dim == 3:   # 3-channel axial slice
+        den_arr = np.zeros([arr.shape[2], arr.shape[1]])
+        counter_arr = np.zeros([arr.shape[2], arr.shape[1]])
+        height = arr.shape[1]  # y
+        width = arr.shape[2]  # x
+    else:
+        # Init output and counter arrays
+        den_arr = np.zeros(arr.shape)
+        counter_arr = np.zeros(arr.shape)
+        height = arr.shape[0]  # y
+        width = arr.shape[1]  # x
 
     if overlap is None:
         ry = int(np.ceil(height / patch_size[0]))
@@ -110,27 +113,45 @@ def denoise_slice_gaussian(vol, model, overlap=None, patch_size=None, device='cu
     for y in range(1, ry + 1):
         start_x = 0
         for x in range(1, rx + 1):
+            patch = None
+            den_slice_coordinates = None
             # Calculate patch location
             if y != ry and x != rx:
-                patch = arr[start_y:start_y + patch_size[0], start_x:start_x + patch_size[1]]
-                den_slice = (slice(start_y, start_y + patch_size[0]), slice(start_x, start_x + patch_size[1]))
+                if dim == 3:
+                    patch = arr[:, start_y:start_y + patch_size[0], start_x:start_x + patch_size[1]]
+                else:
+                    patch = arr[start_y:start_y + patch_size[0], start_x:start_x + patch_size[1]]
+                den_slice_coordinates = (slice(start_y, start_y + patch_size[0]),
+                                         slice(start_x, start_x + patch_size[1]))
             elif y == ry and x != rx:
-                patch = arr[-patch_size[0]:, start_x:start_x + patch_size[1]]
-                den_slice = (slice(-patch_size[0], None), slice(start_x, start_x + patch_size[1]))
+                if dim == 3:
+                    patch = arr[:, -patch_size[0]:, start_x:start_x + patch_size[1]]
+                else:
+                    patch = arr[-patch_size[0]:, start_x:start_x + patch_size[1]]
+                den_slice_coordinates = (slice(-patch_size[0], None), slice(start_x, start_x + patch_size[1]))
             elif y != ry and x == rx:
-                patch = arr[start_y:start_y + patch_size[0], -patch_size[1]:]
-                den_slice = (slice(start_y, start_y + patch_size[0]), slice(-patch_size[1], None))
+                if dim == 3:
+                    patch = arr[:, start_y:start_y + patch_size[0], -patch_size[1]:]
+                else:
+                    patch = arr[start_y:start_y + patch_size[0], -patch_size[1]:]
+                den_slice_coordinates = (slice(start_y, start_y + patch_size[0]), slice(-patch_size[1], None))
             elif y == ry and x == rx:
-                patch = arr[-patch_size[0]:, -patch_size[1]:]
-                den_slice = (slice(-patch_size[0], None), slice(-patch_size[1], None))
+                if dim == 3:
+                    patch = arr[:, -patch_size[0]:, -patch_size[1]:]
+                else:
+                    patch = arr[-patch_size[0]:, -patch_size[1]:]
+                den_slice_coordinates = (slice(-patch_size[0], None), slice(-patch_size[1], None))
 
             # Inference and accumulate
-            patch_tensor = patch_to_tensor(patch)
+            if dim == 3:
+                patch_tensor = torch.Tensor(patch)
+            else:
+                patch_tensor = patch_to_tensor(patch)
             den = model(patch_tensor.to(device).unsqueeze(0))  # (c, h, w) -> (1, c, h, w)
             den = den.detach().cpu().squeeze(0)
             den = np.asarray(den.squeeze(0))
-            den_arr[den_slice] += den * kernel
-            counter_arr[den_slice] += kernel
+            den_arr[den_slice_coordinates] += den * kernel
+            counter_arr[den_slice_coordinates] += kernel
 
             start_x = (patch_size[1] - divx) * x
         start_y = (patch_size[0] - divy) * y
@@ -328,41 +349,6 @@ def denoise_volume_gaussian(vol, model, overlap=None, patch_size=None, device='c
     return den_arr
 
 
-class CrossCorrLoss(nn.Module):
-    """
-    Implementation of pearson correlation coefficient (cross correlation) as a loss function.
-    The best correlation means maximizing the coefficient --> minimizing the loss means maximizing
-    the coefficient ot minimizing the negative coefficient.
-    """
-
-    def __init__(self):
-        super(CrossCorrLoss, self).__init__()
-
-    def forward(self, output, target):
-        x = output
-        y = target
-
-        vx = x - torch.mean(x)
-        vy = y - torch.mean(y)
-
-        return -(torch.sum(vx * vy) / (torch.sqrt(torch.sum(vx ** 2)) * torch.sqrt(torch.sum(vy ** 2))))
-
-
-class L1NormalizedLoss(nn.Module):
-    """
-    Implementation of the L1 loss function, with a normalization factor (real value + prediction + 1).
-    """
-
-    def __init__(self):
-        super(L1NormalizedLoss, self).__init__()
-
-    def forward(self, output, target):
-        x = output
-        y = target
-
-        return torch.mean(torch.abs(x - y) / (x + y + 1))
-
-
 def kfold_cross_validation(k, data):
     validation_folds = {}
 
@@ -396,6 +382,10 @@ def check_dataset_integrity(training_pairs):
 
         img_shape = np.asarray(img_itk).shape
         img_spacing = dict(img_itk)['spacing']
+
+        if len(img_shape) != 3:
+            print(f"All images must be 3D! (Found {img_shape} shape)")
+            sys.exit()
 
         if (np.array_equal(img_spacing, dict(ref_itk)['spacing']) and
                 np.array_equal(img_shape, np.asarray(ref_itk).shape)):
@@ -460,7 +450,7 @@ def get_dataset(training_pairs=None, path_to_training=None, path_to_reference=No
 
 
 def create_configuration_file():
-    config_file = "training_2025-02-10_15-11/configuration.json"
+    config_file = "manuscript_model/configuration.json"
 
     configuration = {
         "datetime": datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
@@ -476,12 +466,12 @@ def create_configuration_file():
         "learning_rate_decay_rate": None,
         "learning_rate_decay_steps": None,
         "perform_data_augmentation": None,
-        "training_set_fraction": 0.25
+        "training_set_fraction": None
     }
 
-    while configuration["network_configuration"] not in ["3D", "2.5D-1channel", "2.5D-3channel"]:
+    while configuration["network_configuration"] not in ["3D", "1channel-2.5D", "3channel-2.5D"]:
         configuration["network_configuration"] = \
-            input("Enter network configuration (3D, 2.5D-1channel, 2.5D-3channel): ")
+            input("Enter network configuration (3D, 1channel-2.5D, 3channel-2.5D): ")
 
     # Would you like to use standard training parameters? Set to False to introduce manually
     use_default_training_params = None
@@ -542,7 +532,7 @@ def create_configuration_file():
 
         configuration["patch_size"] = [128, 128, 128] if configuration["network_configuration"] == "3D" else [144, 144]
         configuration["loss_function"] = "MSE"
-        configuration["batch_size"] = 1 if configuration["network_configuration"] == "3D" else 144
+        configuration["batch_size"] = 1 if configuration["network_configuration"] == "3D" else 64
         configuration["optimizer"] = "Adam"
         configuration["N_epochs"] = 1000
         configuration["validation_every_N_epochs"] = 20
@@ -550,6 +540,8 @@ def create_configuration_file():
         configuration["learning_rate_decay_rate"] = 0.9
         configuration["learning_rate_decay_steps"] = 50
         configuration["perform_data_augmentation"] = True
+
+    configuration["training_set_fraction"] = 0.25 if configuration["network_configuration"] == "3D" else 0.75
 
     configuration_json = json.dumps(configuration, indent=4)
     open(config_file, "w").close()
@@ -560,129 +552,3 @@ def create_configuration_file():
 
     return configuration
 
-
-class MakeTorchDataset(Dataset):
-    """
-    Class that receives a pd.dataframe in which the first column contains the paths to the input images and the
-    second contains the paths to the target images, and returns the images as torch tensors. Data augmentation
-    is performed.
-    """
-
-    def __init__(self, df, augmentations, dim=None, validation=None, patch_size=None, validation_image_size=None):
-
-        if dim is None:
-            self.dim = 3
-
-        if patch_size is None:
-            patch_size = [128, 128, 128]
-
-        if validation is None:
-            validation = False
-
-        if validation and validation_image_size is None:
-            validation_image_size = [patch_size[0], patch_size[1], patch_size[2]] if dim == 3 else [patch_size[0],
-                                                                                                    patch_size[1]]
-
-        self.patch_size = patch_size
-        self.validation = validation
-        self.df = df
-        self.validation_image_size = validation_image_size
-
-        self.augmentations = augmentations  # method that performs the desired augmentations/transformations
-
-    def __len__(self):
-        return len(self.df)
-
-    def __getitem__(self, idx):
-        augmentations = self.augmentations
-        patch_size = self.patch_size
-        validation = self.validation
-        validation_image_size = self.validation_image_size
-        # Training pair: (input, target)
-        # Column 0: paths to the input images
-        image_path = self.df.iloc[idx, 0]
-        # Column 1: paths do the target images
-        target_path = self.df.iloc[idx, 1]
-
-        # Check if it's not the validation set
-        if not validation:
-            # Check if augmentations must be performed or not
-            if not augmentations:
-                # Input image
-                image = np.asarray(itk.imread(image_path))  # ATTENTION: path must not contain accents
-
-                # -------------------------- testing new random patch generation (increased probability from the center)
-                random_indices = []
-                for dim in range(image.ndim):
-                    cut = image.shape[dim] - patch_size[dim]
-
-                    if cut > 0:
-                        prob_arr_size = cut // 2 if cut % 2 != 0 else (cut - 1) // 2
-
-                        # gaussian probability function draw
-                        ax = np.arange(-(prob_arr_size // 2), prob_arr_size // 2 + 1)
-                        sigma = prob_arr_size / 3
-                        kernel = np.exp(-(ax ** 2) / (2 * sigma ** 2))
-                        kernel = kernel / np.sum(kernel)
-
-                        random_indices.append(np.random.choice(np.arange(len(kernel)), p=kernel))
-
-                    elif cut == 0:  # if cut = 0, patch size is equal to image size
-                        random_indices.append(0)  # NOT TESTED YET
-
-                    else:  # if cut < 0, patch size is larger than image size
-                        print("patch size larger than image size!")
-                        return 1  # NOT TESTED YET
-
-                z, y, x = random_indices[0], random_indices[1], random_indices[2]  # adapt for 2D
-                # ------------------------------------------------------------------------------------------------------
-
-                # Transforming size (D, W, H) to (D, W, H, C) where C is the number of channels
-                image = image[z:z + patch_size[0], y:y + patch_size[1], x:x + patch_size[2]]
-
-                # Target image
-                target = np.asarray(itk.imread(target_path))  # ATTENTION: path must not contain accents
-                # Transforming size (D, W, H) to (D, W, H, C) where C is the number of channels
-                target = target[z:z + patch_size[0], y:y + patch_size[1], x:x + patch_size[2]]
-
-            else:  # augmentations = True
-                # Input image
-                image = sitk.ReadImage(image_path)  # ATTENTION: path must not contain accents
-                shape = sitk.GetArrayFromImage(image).shape
-                # Target image
-                target = sitk.ReadImage(target_path)  # ATTENTION: path must not contain accents
-
-                # TRANSFORMS
-                image, target = augment(image, target, shape)
-
-        else:  # if validation = True
-
-            image = np.asarray(itk.imread(image_path))  # ATTENTION: path must not contain accents
-            target = np.asarray(itk.imread(target_path))  # ATTENTION: path must not contain accents
-
-            lower_cut = []
-            for dim in range(len(validation_image_size)):
-                lower_cut.append(
-                    0 if validation_image_size[dim] == image.shape[dim] else
-                    int(np.floor((image.shape[dim] - validation_image_size[dim]) / 2))
-                )
-
-            image = image[lower_cut[0]:lower_cut[0] + validation_image_size[0],
-                    lower_cut[1]:lower_cut[1] + validation_image_size[1],
-                    lower_cut[2]:lower_cut[2] + validation_image_size[2]]
-            target = target[lower_cut[0]:lower_cut[0] + validation_image_size[0],
-                     lower_cut[1]:lower_cut[1] + validation_image_size[1],
-                     lower_cut[2]:lower_cut[2] + validation_image_size[2]]
-
-        image = np.expand_dims(image, axis=-1)
-        target = np.expand_dims(target, axis=-1)
-
-        # (D, W, H, C) to (C, D, W, H) <=> (0, 1, 2, 3) to (3, 0, 1, 2)
-        image = np.transpose(image, (3, 0, 1, 2)).astype(float)
-        target = np.transpose(target, (3, 0, 1, 2)).astype(float)
-
-        # Numpy to torch tensor
-        image = torch.Tensor(image)
-        target = torch.Tensor(target)
-
-        return image, target

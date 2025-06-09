@@ -2,6 +2,7 @@
 script to apply the model
 """
 import os
+import shutil
 import sys
 import itk
 import numpy as np
@@ -24,10 +25,10 @@ while img_path is None:
 
 while out_path is None:
     out_path = input("Enter path in which to save the folder with the denoised images: ")
-os.makedirs(os.path.join(out_path, 'denoised'))
-out_path = os.path.join(out_path, 'denoised')
 
 training_instances = [item for item in os.listdir(os.getcwd()) if item.startswith('training')]
+if os.path.exists('manuscript_model'):
+    training_instances.append('manuscript_model')
 if len(training_instances) == 0:
     print('No training instances found!')
     sys.exit()
@@ -56,12 +57,19 @@ with open(os.path.join(training_folder, 'configuration.json')) as json_file:
 patch_size = configuration['patch_size']
 network_configuration = configuration['network_configuration']
 
+out_path = os.path.join(out_path, f'denoised_{network_configuration}')
+if not os.path.exists(out_path):
+    os.makedirs(out_path)
+else:
+    shutil.rmtree(out_path)
+    os.makedirs(out_path)
+
 model = None
 if network_configuration == "3D":
     model = UNet3D()
-elif network_configuration == "2.5D-1channel":
+elif network_configuration == "1channel-2.5D":
     model = UNet25D(in_channels=1)
-elif network_configuration == "2.5D-3channel":
+elif network_configuration == "3channel2-.5D":
     model = UNet25D(in_channels=3)
 
 if model is not None:
@@ -80,26 +88,17 @@ if model is not None:
             height = arr.shape[1]  # y; coronal
             width = arr.shape[2]  # x; sagittal
 
-            den_arr_z = np.zeros(arr.shape)
-            den_arr_y = np.zeros(arr.shape)
-            den_arr_x = np.zeros(arr.shape)
-
-            for z in range(depth):
-                im2d = arr[z, :, :]
-                den_im = denoise_slice_gaussian(im2d, model)
-                den_arr_z[z, :, :] = den_im
-
-            for y in range(height):
-                im2d = arr[:, y, :]
-                den_im = denoise_slice_gaussian(im2d, model)
-                den_arr_y[:, y, :] = den_im
-
-            for x in range(width):
-                im2d = arr[:, :, x]
-                den_im = denoise_slice_gaussian(im2d, model)
-                den_arr_x[:, :, x] = den_im
-
-            den_arr = (den_arr_x + den_arr_y + den_arr_z) / 3
+            den_arr = np.zeros(arr.shape)
+            for i in range(depth):  # axial denoising
+                den_slice = denoise_slice_gaussian(arr[i, :, :], model, patch_size=patch_size)
+                den_arr[i, :, :] = den_arr[i, :, :] + den_slice
+            for j in range(height):  # coronal denoising
+                den_slice = denoise_slice_gaussian(arr[:, j, :], model, patch_size=patch_size)
+                den_arr[:, j, :] = den_arr[:, j, :] + den_slice
+            for k in range(width):  # sagittal denoising
+                den_slice = denoise_slice_gaussian(arr[:, :, k], model, patch_size=patch_size)
+                den_arr[:, :, k] = den_arr[:, :, k] + den_slice
+            den_arr = den_arr / 3  # average of axial, coronal and sagittal-based denoising
 
         image_itk = itk.image_from_array(den_arr)
         for k, v in meta.items():
@@ -107,7 +106,7 @@ if model is not None:
 
         for extension in ['.nii.gz', '.nii', '.nrrd']:
             if img.endswith(extension):
-                img = img.replace(extension, f"_unet3d{extension}")
+                img = img.replace(extension, f"_{network_configuration}{extension}")
                 break
 
         itk.imwrite(image_itk, os.path.join(out_path, img))

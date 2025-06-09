@@ -1,0 +1,132 @@
+{
+    "datetime": "09-06-2025 16:16:55",
+    "dataset": {
+        "training_pairs": [
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_002_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_002_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_006_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_006_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_011_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_011_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_012_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_012_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_013_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_013_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_014_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_014_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_015_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_015_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_016_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_016_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_017_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_017_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_019_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_019_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_020_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_020_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_021_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_021_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_022_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_022_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_023_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_023_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_024_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_024_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_025_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_025_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_026_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_026_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_027_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_027_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_028_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_028_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_029_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_029_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_030_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_030_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_031_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_031_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_032_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_032_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_144_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_144_PET_70s.nii.gz"
+            ],
+            [
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_20s_EARL1\\V_FDG_145_PET_20s.nii.gz",
+                "E:\\FastPETDenoising\\Datasets\\TestSet\\PET_70s_EARL1\\V_FDG_145_PET_70s.nii.gz"
+            ]
+        ],
+        "validation_image_size": [
+            191,
+            144,
+            144
+        ],
+        "spacing": [
+            4.0,
+            4.0,
+            4.0
+        ]
+    },
+    "patch_size": [
+        144,
+        144
+    ],
+    "network_configuration": "1channel-2.5D",
+    "loss_function": "MSE",
+    "batch_size": 144,
+    "optimizer": "Adam",
+    "N_epochs": 1000,
+    "validation_every_N_epochs": 20,
+    "learning_rate": 0.01,
+    "learning_rate_decay_rate": 0.9,
+    "learning_rate_decay_steps": 50,
+    "perform_data_augmentation": true,
+    "training_set_fraction": 0.75
+}

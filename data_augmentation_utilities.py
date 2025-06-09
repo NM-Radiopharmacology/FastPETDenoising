@@ -162,7 +162,7 @@ def composeScaleSkew_parameter_space_random_sampling(s):
     return [[float(sx), float(sy), float(sz)], [tx, ty, tz], [k0, k1, k2]]
 
 
-def augment(im, tar, shape, patch_size=128):
+def augment(im, tar, shape):
     data = [im, tar]
     dimension = data[0].GetDimension()  # dimension = 3
 
@@ -240,19 +240,10 @@ def augment(im, tar, shape, patch_size=128):
                                               interpolator=sitk.sitkBSpline)
     target = sitk.GetArrayFromImage(target)
 
-    z = random.randint(0, image.shape[0] - patch_size)
-    y = random.randint(0, image.shape[1] - patch_size)
-    x = random.randint(0, image.shape[2] - patch_size)
-
-    # noise = np.random.normal(loc=1.0, scale=0.1, size=np.asarray([PATCH_SIZE] * 3))
-
-    # Transforming size (D, W, H) to (D, W, H, C) where C is the number of channels
-    image = image[z:z + patch_size, y:y + patch_size, x:x + patch_size]
     image[image < 0] = 0
+    # noise = np.random.normal(loc=1.0, scale=0.1, size=np.asarray(image.shape))
     #image = np.multiply(image, noise)
 
-    # Transforming size (D, W, H) to (D, W, H, C) where C is the number of channels
-    target = target[z:z + patch_size, y:y + patch_size, x:x + patch_size]
     target[target < 0] = 0
 
     return image, target

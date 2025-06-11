@@ -7,14 +7,14 @@ The U-Net is a CNN architecture designed by Ronneberger, Fischer and Brox (2015)
 ### 3D U-Net
 The network's input is, by default, a 128×128×128 volume. The number of encoder/decoder blocks was reduced to three to reduce computational complexity, as we are dealing with 3D images. Each encoder block is composed by two convolutional layers followed by a downsampling layer. Each convolutional layer contains a **convolution** that doubles the number of feature maps (except in the input block, where, by default, 64 feature maps are extracted from the 1-channel input) and a **ReLU activation**. Batch normalisation was removed, as the scale of each PET image, in particular, is not fixed-range and contains important physiological information which musn't be altered. Downsampling is done through **average pooling**, instead of max pooling, as denoising is not a classification problem.
 
-<img src="/figures/unet_3D.png" alt="Responsive image" style="max-width: 75%; height: auto;">
+<img src="/figures/unet_3D.png" alt="3D U-Net architecture" style="max-width: 75%; height: auto;">
 
 The implementation of this CNN can be found in `networks/unet_three_d.py`.
 
 ### 3-channel 2.5D U-Net
 This "conventional" 2.5D approach was implemented for axial-based denoising of the PET images. The network's input is, by default, a 3-channel 144×144 image. The 3 channels correspond to each axial slice (middle channel) and its immediately prior and successful slices. The network's first layer flattens the 3 channels into one, and a U-Net architecture follows, contemplating the same denoising-specific alterations described in the 3D U-Net section above.
 
-<img src="/figures/unet_3channel-2.5D.png" alt="Responsive image" style="max-width: 95%; height: auto;">
+<img src="/figures/unet_3channel-2.5D.png" alt="3-channel 2.5D U-Net architecture" style="max-width: 95%; height: auto;">
 
 The implementation of this CNN can be found in `networks/unet_two_and_a_half_d.py`.
 
@@ -22,7 +22,7 @@ The implementation of this CNN can be found in `networks/unet_two_and_a_half_d.p
 
 This 1-channel 2.5D approach was implemented for 2D denoising of all three anatomical planes - axial, coronal and sagittal. The network's input is, by default, a 144×144 image patch. U-Net architecture contemplates the same denoising-specific alterations described in the 3D U-Net section above.
 
-<img src="/figures/unet_1channel-2.5D.png" alt="Responsive image" style="max-width: 95%; height: auto;">
+<img src="/figures/unet_1channel-2.5D.png" alt="1-channel 2.5D U-Net architecture" style="max-width: 95%; height: auto;">
 
 The implementation of this CNN can be found in `networks/unet_two_and_a_half_d.py`.
 

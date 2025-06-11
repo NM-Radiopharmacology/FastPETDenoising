@@ -171,9 +171,9 @@ class MakeTorchDataset(Dataset):
             image = np.transpose(image, (3, 0, 1, 2)).astype(float) if image.ndim == 4 else (
                 np.transpose(image, (2, 0, 1)).astype(float))
 
-        target = np.expand_dims(target, axis=-1)
-        target = np.transpose(target, (3, 0, 1, 2)).astype(float) if target.ndim == 4 else (
-            np.transpose(target, (2, 0, 1)).astype(float))
+            target = np.expand_dims(target, axis=-1)
+            target = np.transpose(target, (3, 0, 1, 2)).astype(float) if target.ndim == 4 else (
+                np.transpose(target, (2, 0, 1)).astype(float))
 
         # Numpy to torch tensor
         image = torch.Tensor(image)

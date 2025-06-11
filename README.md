@@ -74,4 +74,7 @@ Running `3_loss_plot.py` will generate a `matplotlib.Figure` pop-up window which
 #### Step 4: Applying the model ⟶ `4_inference.py`
 
 To apply the model, the user need only run `4_inference.py` and introduce path to the images to denoise. This script will find the local training instances, request which one to employ and, subsequently, which model to use. From `coniguration.json`, relevant model parameters (e.g. CNN architecture) are loaded automatically.
- 
+
+### Pre-trained models
+
+Pre-trained models will be released soon...

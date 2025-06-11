@@ -536,7 +536,7 @@ def create_configuration_file():
         configuration["optimizer"] = "Adam"
         configuration["N_epochs"] = 1000
         configuration["validation_every_N_epochs"] = 20
-        configuration["learning_rate"] = 0.01
+        configuration["learning_rate"] = 0.001
         configuration["learning_rate_decay_rate"] = 0.9
         configuration["learning_rate_decay_steps"] = 50
         configuration["perform_data_augmentation"] = True

@@ -72,8 +72,7 @@ def validator(data_loader, model, loss_function, device):
 
             for im in images:
                 arr = im.detach().cpu().numpy()
-                if network_configuration != "3channel-2.5D":
-                    arr = arr.squeeze(0)
+                arr = arr.squeeze(0)
                 arr = np.asarray(arr)
 
                 if list(arr.shape) != list(patch_size):
@@ -106,7 +105,7 @@ def validator(data_loader, model, loss_function, device):
                                 slice_to_denoise[1, :, :] = arr[i, :, :]
                                 slice_to_denoise[2, :, :] = slice_to_reflect
                             else:
-                                slice_to_denoise = arr[i-1:i+1, :, :]
+                                slice_to_denoise = arr[i-1:i+2, :, :]
 
                             den_slice = denoise_slice_gaussian(slice_to_denoise, model, patch_size=patch_size)
                             den[i, :, :] = den[i, :, :] + den_slice
@@ -190,7 +189,7 @@ for fold in validation_folds.keys():
                 elif network_configuration == "3channel-2.5D":
                     anatomical_plane = 'axial'      # z
                     for i in range(img_shape[0]):
-                        if i != 0 and i != img_shape[0] - 1:    # excluding first and last slices
+                        if i not in [0, img_shape[0] - 2, img_shape[0] - 1]:    # excluding first and last slices
                             training_lst.append([pair[0], pair[1], anatomical_plane, i])
 
     printdt(f'training set size: {len(training_lst)}')

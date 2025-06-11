@@ -10,6 +10,7 @@ class ConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
 
         super().__init__()
+        self.in_channels = in_channels
 
         if in_channels == 3:
             self.conv0 = nn.Conv2d(in_channels, out_channels=1, kernel_size=3, padding='same', padding_mode='reflect')
@@ -38,13 +39,13 @@ class ConvBlock(nn.Module):
 
     def forward(self, inputs):
 
-        try:
+        if self.in_channels == 3:
             x = self.conv0(inputs)
             x = self.conv1(x)
             x = self.relu(x)
             x = self.conv2(x)
             x = self.relu(x)
-        except AttributeError:
+        else:
             x = self.conv1(inputs)
             x = self.relu(x)
             x = self.conv2(x)

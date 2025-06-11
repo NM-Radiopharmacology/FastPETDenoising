@@ -28,7 +28,7 @@ while out_path is None:
 
 training_instances = [item for item in os.listdir(os.getcwd()) if item.startswith('training')]
 if os.path.exists('manuscript_model'):
-    training_instances.append('manuscript_model')
+    training_instances.insert(0, 'manuscript_model')
 if len(training_instances) == 0:
     print('No training instances found!')
     sys.exit()
@@ -69,7 +69,7 @@ if network_configuration == "3D":
     model = UNet3D()
 elif network_configuration == "1channel-2.5D":
     model = UNet25D(in_channels=1)
-elif network_configuration == "3channel2-.5D":
+elif network_configuration == "3channel-2.5D":
     model = UNet25D(in_channels=3)
 
 if model is not None:
@@ -81,9 +81,10 @@ if model is not None:
         arr = np.asarray(itk.imread(os.path.join(img_path, img)))  # Array of the 3D image to split in patches
         meta = dict(itk.imread(os.path.join(img_path, img)))
 
+        den_arr = None
         if network_configuration == "3D":
             den_arr = denoise_volume_gaussian(arr, model, patch_size=patch_size, device=device)
-        else:
+        elif network_configuration == "1channel-2.5D":
             depth = arr.shape[0]  # z; axial
             height = arr.shape[1]  # y; coronal
             width = arr.shape[2]  # x; sagittal
@@ -99,14 +100,33 @@ if model is not None:
                 den_slice = denoise_slice_gaussian(arr[:, :, k], model, patch_size=patch_size)
                 den_arr[:, :, k] = den_arr[:, :, k] + den_slice
             den_arr = den_arr / 3  # average of axial, coronal and sagittal-based denoising
+        elif network_configuration == "3channel-2.5D":
+            den_arr = np.zeros(arr.shape)
+            for i in range(arr.shape[0]):  # axial denoising
+                if i == 0 or i == arr.shape[0] - 1:
+                    if i == 0:
+                        slice_to_reflect = arr[i + 1, :, :]
+                    if i == arr.shape[0] - 1:
+                        slice_to_reflect = arr[arr.shape[0] - 2, :, :]
 
-        image_itk = itk.image_from_array(den_arr)
-        for k, v in meta.items():
-            image_itk[k] = v
+                    slice_to_denoise = np.zeros([3, arr.shape[1], arr.shape[2]])
+                    slice_to_denoise[0, :, :] = slice_to_reflect
+                    slice_to_denoise[1, :, :] = arr[i, :, :]
+                    slice_to_denoise[2, :, :] = slice_to_reflect
+                else:
+                    slice_to_denoise = arr[i - 1:i + 2, :, :]
 
-        for extension in ['.nii.gz', '.nii', '.nrrd']:
-            if img.endswith(extension):
-                img = img.replace(extension, f"_{network_configuration}{extension}")
-                break
+                den_slice = denoise_slice_gaussian(slice_to_denoise, model, patch_size=patch_size)
+                den_arr[i, :, :] = den_arr[i, :, :] + den_slice
 
-        itk.imwrite(image_itk, os.path.join(out_path, img))
+        if den_arr is not None:
+            image_itk = itk.image_from_array(den_arr)
+            for k, v in meta.items():
+                image_itk[k] = v
+
+            for extension in ['.nii.gz', '.nii', '.nrrd']:
+                if img.endswith(extension):
+                    img = img.replace(extension, f"_{network_configuration}{extension}")
+                    break
+
+            itk.imwrite(image_itk, os.path.join(out_path, img))

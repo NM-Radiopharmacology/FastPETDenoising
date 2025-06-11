@@ -165,15 +165,16 @@ class MakeTorchDataset(Dataset):
                      lower_cut[1]:lower_cut[1] + validation_image_size[1],
                      lower_cut[2]:lower_cut[2] + validation_image_size[2]]
 
-        if self.network_configuration != "3channel-2.5D":
+        if (self.network_configuration != "3channel-2.5D" or
+                (self.network_configuration == "3channel-2.5D" and validation)):
             image = np.expand_dims(image, axis=-1)
             # (D, W, H, C) to (C, D, W, H) <=> (0, 1, 2, 3) to (3, 0, 1, 2)
             image = np.transpose(image, (3, 0, 1, 2)).astype(float) if image.ndim == 4 else (
                 np.transpose(image, (2, 0, 1)).astype(float))
 
-            target = np.expand_dims(target, axis=-1)
-            target = np.transpose(target, (3, 0, 1, 2)).astype(float) if target.ndim == 4 else (
-                np.transpose(target, (2, 0, 1)).astype(float))
+        target = np.expand_dims(target, axis=-1)
+        target = np.transpose(target, (3, 0, 1, 2)).astype(float) if target.ndim == 4 else (
+            np.transpose(target, (2, 0, 1)).astype(float))
 
         # Numpy to torch tensor
         image = torch.Tensor(image)

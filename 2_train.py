@@ -145,6 +145,7 @@ validation_image_size = configuration["dataset"]["validation_image_size"]
 patch_size = configuration["patch_size"]
 
 network_configuration = configuration['network_configuration']
+pooling = configuration["pooling"]
 loss_function_key = configuration['loss_function']
 training_set_fraction = configuration['training_set_fraction']
 perform_data_augmentation = configuration['perform_data_augmentation']
@@ -231,13 +232,13 @@ for fold in validation_folds.keys():
 
     model = None
     if network_configuration == "3D":
-        model = UNet3D()
+        model = UNet3D(pooling=pooling)
         input_size = (1, patch_size[0], patch_size[1], patch_size[2])
     elif network_configuration == "1channel-2.5D":
-        model = UNet25D(in_channels=1)
+        model = UNet25D(in_channels=1, pooling=pooling)
         input_size = (1, patch_size[0], patch_size[1])
     elif network_configuration == "3channel-2.5D":
-        model = UNet25D(in_channels=3)
+        model = UNet25D(in_channels=3, pooling=pooling)
         input_size = (3, patch_size[0], patch_size[1])
     else:
         printdt(f"unknown network_configuration: {network_configuration}")

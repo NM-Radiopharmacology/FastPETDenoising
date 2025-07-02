@@ -450,13 +450,14 @@ def get_dataset(training_pairs=None, path_to_training=None, path_to_reference=No
 
 
 def create_configuration_file():
-    config_file = "manuscript_model/configuration.json"
+    config_file = "configuration.json"
 
     configuration = {
         "datetime": datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
         "dataset": get_dataset(),
         "patch_size": None,
         "network_configuration": None,
+        "pooling": None,
         "loss_function": None,
         "batch_size": None,
         "optimizer": None,
@@ -501,6 +502,9 @@ def create_configuration_file():
             except ValueError:
                 pass
 
+        while configuration['pooling'] not in ['average', 'strided-conv']:
+            configuration["pooling"] = input("Enter pooling type (average, strided-conv): ")
+
         while configuration["loss_function"] not in ["MSE", "L1", "normalised_L1", "CrossCorr"]:
             configuration["loss_function"] = input("Enter loss function (MSE, L1, normalised_L1, CrossCorr): ")
 
@@ -531,6 +535,7 @@ def create_configuration_file():
     else:
 
         configuration["patch_size"] = [128, 128, 128] if configuration["network_configuration"] == "3D" else [144, 144]
+        configuration["poolinge"] = 'average'
         configuration["loss_function"] = "MSE"
         configuration["batch_size"] = 1 if configuration["network_configuration"] == "3D" else 64
         configuration["optimizer"] = "Adam"

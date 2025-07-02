@@ -29,6 +29,8 @@ while out_path is None:
 training_instances = [item for item in os.listdir(os.getcwd()) if item.startswith('training')]
 if os.path.exists('pretrained_models/unet_3channel-2.5D'):
     training_instances.insert(0, 'pretrained_models/unet_3channel-2.5D')
+if os.path.exists('pretrained_models/unet_3D'):
+    training_instances.insert(0, 'pretrained_models/unet_3D')
 if len(training_instances) == 0:
     print('No training instances found!')
     sys.exit()
@@ -56,6 +58,7 @@ with open(os.path.join(training_folder, 'configuration.json')) as json_file:
 
 patch_size = configuration['patch_size']
 network_configuration = configuration['network_configuration']
+pooling = configuration['pooling']
 
 out_path = os.path.join(out_path, f'denoised_{network_configuration}')
 if not os.path.exists(out_path):
@@ -66,15 +69,15 @@ else:
 
 model = None
 if network_configuration == "3D":
-    model = UNet3D()
+    model = UNet3D(pooling=pooling)
 elif network_configuration == "1channel-2.5D":
-    model = UNet25D(in_channels=1)
+    model = UNet25D(in_channels=1, pooling=pooling)
 elif network_configuration == "3channel-2.5D":
-    model = UNet25D(in_channels=3)
+    model = UNet25D(in_channels=3, pooling=pooling)
 
 if model is not None:
     model.to(device)
-    model.load_state_dict(torch.load(os.path.join(model_path)))
+    model.load_state_dict(torch.load(model_path, weights_only=True))
 
     printdt(f"starting inference from model {training_folder}/{model_path.split(os.sep)[-1]}")
     for img in tqdm(os.listdir(img_path), file=sys.stdout, desc=datetime.now().strftime("%d/%m/%Y %H:%M:%S")):

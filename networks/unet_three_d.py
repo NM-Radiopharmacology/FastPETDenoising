@@ -30,12 +30,14 @@ class ConvBlock(nn.Module):
 
 class EncoderBlock(nn.Module):
 
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, pooling):
         super().__init__()
 
         self.conv = ConvBlock(in_channels, out_channels)
-        #self.pool = nn.AvgPool3d((2, 2, 2))
-        self.pool = nn.Conv3d(out_channels, out_channels, kernel_size=2, stride=2)
+        if pooling == 'average':
+            self.pool = nn.AvgPool3d((2, 2, 2))
+        else:
+            self.pool = nn.Conv3d(out_channels, out_channels, kernel_size=2, stride=2)
 
     def forward(self, inputs):
 
@@ -66,17 +68,22 @@ class DecoderBlock(nn.Module):
 
 class UNet3D(nn.Module):
 
-    def __init__(self, n_channels=None):
+    def __init__(self, n_channels=None, pooling=None):
 
         if n_channels is None:
             n_channels = 64
 
+        if pooling is None:
+            pooling = 'average'
+
+        self.pooling = pooling
+
         super().__init__()
 
         """ Encoder """
-        self.e1 = EncoderBlock(1, n_channels)
-        self.e2 = EncoderBlock(n_channels, n_channels * 2)
-        self.e3 = EncoderBlock(n_channels * 2, n_channels * 4)
+        self.e1 = EncoderBlock(1, n_channels, pooling=pooling)
+        self.e2 = EncoderBlock(n_channels, n_channels * 2, pooling=pooling)
+        self.e3 = EncoderBlock(n_channels * 2, n_channels * 4, pooling=pooling)
 
         """ Bottleneck """
         self.b = ConvBlock(n_channels * 4, n_channels * 8)

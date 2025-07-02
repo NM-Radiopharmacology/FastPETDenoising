@@ -7,9 +7,10 @@
         ]
     },
     "patch_size": [
-        144,
-        144
+        128,
+        128,
+        128
     ],
-    "network_configuration": "3channel-2.5D",
+    "network_configuration": "3D",
     "pooling": "average"
 }

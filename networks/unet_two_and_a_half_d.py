@@ -56,12 +56,15 @@ class ConvBlock(nn.Module):
 
 class EncoderBlock(nn.Module):
 
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, pooling):
 
         super().__init__()
 
         self.conv = ConvBlock(in_channels, out_channels)
-        self.pool = nn.AvgPool2d((2, 2))
+        if pooling == 'average':
+            self.pool = nn.AvgPool2d((2, 2))
+        else:
+            self.pool = nn.Conv2d(out_channels, out_channels, kernel_size=2, stride=2)
 
     def forward(self, inputs):
 
@@ -95,22 +98,25 @@ class DecoderBlock(nn.Module):
 
 class UNet25D(nn.Module):
 
-    def __init__(self, in_channels=None):
+    def __init__(self, in_channels=None, pooling=None):
 
         super().__init__()
 
         if in_channels is None:
             in_channels = 1
-        else:
-            in_channels = in_channels
 
         self.in_channels = in_channels
 
+        if pooling is None:
+            pooling = 'average'
+
+        self.pooling = pooling
+
         """ Encoder """
-        self.e1 = EncoderBlock(in_channels, 64)
-        self.e2 = EncoderBlock(64, 128)
-        self.e3 = EncoderBlock(128, 256)
-        self.e4 = EncoderBlock(256, 512)
+        self.e1 = EncoderBlock(in_channels, 64, pooling=pooling)
+        self.e2 = EncoderBlock(64, 128, pooling=pooling)
+        self.e3 = EncoderBlock(128, 256, pooling=pooling)
+        self.e4 = EncoderBlock(256, 512, pooling=pooling)
 
         """ Bottleneck """
         self.b = ConvBlock(512, 1024)

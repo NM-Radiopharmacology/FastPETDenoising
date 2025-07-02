@@ -77,4 +77,8 @@ To apply the model, the user need only run `4_inference.py` and introduce path t
 
 ### Pre-trained models
 
+#### 3D U-Net
+`pretrained_models/unet_3D` contains a pre-trained 3D U-Net model. To use it, just run `inference.py`. This model was trained on 128×128×128 patches with a voxel spacing of 4×4×4 mm.
+
+#### 1-channel 2.5D U-Net
 `pretrained_models/unet_3channel-2.5D` contains a pre-trained 3-channel 2.5D U-Net model. To use it, just run `inference.py`. This model was trained on 144×144 patches with a voxel spacing of 4×4×4 mm.

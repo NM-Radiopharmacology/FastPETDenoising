@@ -27,8 +27,8 @@ while out_path is None:
     out_path = input("Enter path in which to save the folder with the denoised images: ")
 
 training_instances = [item for item in os.listdir(os.getcwd()) if item.startswith('training')]
-if os.path.exists('manuscript_model'):
-    training_instances.insert(0, 'manuscript_model')
+if os.path.exists('pretrained_models/unet_3channel-2.5D'):
+    training_instances.insert(0, 'pretrained_models/unet_3channel-2.5D')
 if len(training_instances) == 0:
     print('No training instances found!')
     sys.exit()

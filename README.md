@@ -42,7 +42,7 @@ pip install -r requirements.txt
 ### Training
 
 #### Step 1: Dataset & training parameters ⟶ `1_define_training_configuration.py`
-The pipeline for all networks expects 3D input images - the network-specific inputs are managed when loading data before training. The user need only provide the paths to the training images and to the respective reference images. This is done by running `1_define_training_configuration.py`. During this step, the user can also alter some training parameters, like learning rate, optimizer, loss function, etc.
+The pipeline for all networks (1-channel 2.5D, 3-channel 2.5D and 3D) expects 3D input images - the network-specific inputs are managed when loading data before training. The user need only provide the paths to the training images and to the respective reference images. This is done by running `1_define_training_configuration.py`. During this step, the user can also alter some training parameters, like learning rate, optimizer, loss function, etc.
 
 **Important!** Training images and respective references must be ordered alphabetically! For instance:
 
@@ -73,7 +73,7 @@ Running `3_loss_plot.py` will generate a `matplotlib.Figure` pop-up window which
 
 #### Step 4: Applying the model ⟶ `4_inference.py`
 
-To apply the model, the user need only run `4_inference.py` and introduce path to the images to denoise. This script will find the local training instances, request which one to employ and, subsequently, which model to use. From `coniguration.json`, relevant model parameters (e.g. CNN architecture) are loaded automatically.
+To apply the model, the user need only run `4_inference.py` and introduce path to the images to denoise. This script will find the local training instances, request which one to employ and, subsequently, which model to use. From `configuration.json`, relevant model parameters (e.g. CNN architecture) are loaded automatically.
 
 ### Pre-trained models
 

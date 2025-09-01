@@ -1,5 +1,8 @@
 # FastPETDenoising
-Adaptation of the U-Net architecture for denoising fast-acquisition PET images.
+Adaptation of the U-Net architecture for denoising fast-acquisition PET images. 
+
+
+C. Silva, L. et al, An AI-Based Solution for Denoising Fast-Acquisition [<sup>18</sup>F]FDG PET: Clinical Feasibility and Quantitative Assessment, <i>J Digit Imaging. Inform. med.</i> (2025). https://doi.org/10.1007/s10278-025-01638-9
 
 ## CNN Architectures
 The U-Net is a CNN architecture designed by Ronneberger, Fischer and Brox (2015), for the purpose of biomedical image segmentation. Here, an adaptation of this architecture was built for biomedical image denoising. In particular, this project was developed for restoring fast-acquisition PET images to their standard quality. 2.5D and 3D implementations are provided.

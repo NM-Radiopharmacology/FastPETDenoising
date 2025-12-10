@@ -10,7 +10,7 @@ import torch
 import json
 from networks.unet_three_d import UNet3D
 from networks.unet_two_and_a_half_d import UNet25D
-from utilities import printdt, denoise_volume_gaussian, denoise_slice_gaussian
+from utilities import printdt, pad_to_patch_size, denoise_volume_gaussian, denoise_slice_gaussian
 from tqdm import tqdm
 from datetime import datetime
 
@@ -26,7 +26,8 @@ while img_path is None:
 while out_path is None:
     out_path = input("Enter path in which to save the folder with the denoised images: ")
 
-training_instances = [item for item in os.listdir(os.getcwd()) if item.startswith('training')]
+training_instances = ['pretrained_models/' + item for item in os.listdir(os.path.join(os.getcwd(), 'pretrained_models'))
+                      if item.startswith('training')]
 if os.path.exists('pretrained_models/unet_1channel-2.5D'):
     training_instances.insert(0, 'pretrained_models/unet_1channel-2.5D')
 if os.path.exists('pretrained_models/unet_3channel-2.5D'):
@@ -79,11 +80,15 @@ elif network_configuration == "3channel-2.5D":
 
 if model is not None:
     model.to(device)
-    model.load_state_dict(torch.load(model_path, weights_only=True))
+    model.load_state_dict(torch.load(model_path, weights_only=True, map_location=torch.device(device)))
 
     printdt(f"starting inference from model {training_folder}/{model_path.split(os.sep)[-1]}")
     for img in tqdm(os.listdir(img_path), file=sys.stdout, desc=datetime.now().strftime("%d/%m/%Y %H:%M:%S")):
         arr = np.asarray(itk.imread(os.path.join(img_path, img)))  # Array of the 3D image to split in patches
+        original_shape = None
+        if arr.shape[0] < patch_size[0] or arr.shape[1] < patch_size[1] or arr.shape[2] < patch_size[2]:
+            original_shape = arr.shape
+            arr = pad_to_patch_size(arr, patch_size)
         meta = dict(itk.imread(os.path.join(img_path, img)))
 
         den_arr = None
@@ -125,6 +130,9 @@ if model is not None:
                 den_arr[i, :, :] = den_arr[i, :, :] + den_slice
 
         if den_arr is not None:
+            if original_shape is not None:
+                croppings = tuple(slice(0, dim) for dim in original_shape)
+                den_arr = den_arr[croppings]
             image_itk = itk.image_from_array(den_arr)
             for k, v in meta.items():
                 image_itk[k] = v

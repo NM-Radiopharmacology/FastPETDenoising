@@ -13,6 +13,16 @@ def printdt(*args):
     print(datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), *args)
 
 
+def pad_to_patch_size(array, patch_size):
+    pad_width = []
+    for i in range(len(patch_size)):
+        diff = patch_size[i] - array.shape[i]
+        pad_amount = max(0, diff)
+        pad_width.append((0, pad_amount))
+
+    return np.pad(array, pad_width, mode='constant', constant_values=0)
+
+
 def patch_to_tensor(patch):
     if len(patch.shape) == 3:
         patch = np.expand_dims(patch, axis=-1)
